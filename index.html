@@ -116,19 +116,34 @@
                 '40GP': 3200,
                 '40HC': 3400,
             },
-            // Qatar clearance costs (QAR)
+            // Qatar clearance costs (QAR) - CMA CGM Tariff Structure
             qatarClearance: {
                 customsDutyRate: 0.05, // 5% standard
                 mwaniCharges: 160,
-                deliveryOrderFees: 2150,
+                deliveryOrder: {
+                    '20GP': 650,
+                    '40GP': 1000,
+                    '40HC': 1100,
+                },
+                terminalHandling: {
+                    '20GP': 650,
+                    '40GP': 1000,
+                    '40HC': 1100,
+                },
+                containerReturn: {
+                    '20GP': 150,
+                    '40GP': 300,
+                    '40HC': 380,
+                },
+                containerMaintenance: {
+                    '20GP': 20.02,
+                    '40GP': 40.04,
+                    '40HC': 40.04,
+                },
+                terminalInspection: 35,
                 inspectionCharge: 50,
                 clearanceAgentFees: 250,
                 documentAttestation: 100,
-                terminalHandling: {
-                    '20GP': 550,
-                    '40GP': 900,
-                    '40HC': 900,
-                },
             },
             // Local transportation in Qatar (QAR)
             localTransport: 800,
@@ -139,7 +154,7 @@
             // Certification cost per shipment (USD)
             certificationCost: 150,
             // USD to QAR exchange rate
-            usdToQar: 3.64,
+            usdToQar: 3.65,
             // Default profit margin
             profitMargin: 0.15,
             // Default commission rate
@@ -165,6 +180,26 @@
                 minimumFractionDigits: decimals,
                 maximumFractionDigits: decimals,
             }).format(num);
+        };
+
+        // Calculate MOFA attestation fees based on tiered structure
+        const calculateMofaFee = (invoiceValueQar) => {
+            const certificateOfOrigin = 150; // Fixed QAR 150
+
+            let attestationFee = 0;
+            if (invoiceValueQar <= 15000) {
+                attestationFee = 500;
+            } else if (invoiceValueQar <= 100000) {
+                attestationFee = 1000;
+            } else if (invoiceValueQar <= 250000) {
+                attestationFee = 2500;
+            } else if (invoiceValueQar <= 1000000) {
+                attestationFee = 5000;
+            } else {
+                attestationFee = invoiceValueQar * 0.006; // 0.6%
+            }
+
+            return certificateOfOrigin + attestationFee;
         };
 
         // ============================================
@@ -233,7 +268,8 @@
             }
 
             // Domestic China shipping
-            const domesticChinaShipping = totalCbm * rates.domesticChinaPerCbm;
+            const domesticChinaRate = overrides.domesticChinaPerCbmOverride || rates.domesticChinaPerCbm;
+            const domesticChinaShipping = totalCbm * domesticChinaRate;
 
             // Calculate freight subtotal
             const freightSubtotal = seaFreightTotal + domesticChinaShipping;
@@ -249,24 +285,41 @@
             // Qatar customs and clearance (all in QAR)
             const customsDuty = cifValueQar * rates.qatarClearance.customsDutyRate;
             
-            // Terminal handling based on containers
+            // Calculate container-based fees (all in QAR)
+            let deliveryOrderFees = 0;
             let terminalHandling = 0;
+            let containerReturn = 0;
+            let containerMaintenance = 0;
             containers.forEach(type => {
                 if (type !== 'LCL') {
-                    terminalHandling += rates.qatarClearance.terminalHandling[type] || 900;
+                    deliveryOrderFees += rates.qatarClearance.deliveryOrder[type] || 1000;
+                    terminalHandling += rates.qatarClearance.terminalHandling[type] || 1000;
+                    containerReturn += rates.qatarClearance.containerReturn[type] || 300;
+                    containerMaintenance += rates.qatarClearance.containerMaintenance[type] || 40.04;
                 } else {
-                    terminalHandling += 300; // LCL terminal fees
+                    // LCL fees (approximate)
+                    deliveryOrderFees += 200;
+                    terminalHandling += 300;
+                    containerReturn += 50;
+                    containerMaintenance += 10;
                 }
             });
+
+            // Calculate MOFA attestation fees based on invoice value (use totalExwCost in QAR)
+            const invoiceValueQar = totalExwCost * rates.usdToQar;
+            const mofaAttestation = calculateMofaFee(invoiceValueQar);
 
             const qatarCharges = {
                 customsDuty,
                 mwaniCharges: rates.qatarClearance.mwaniCharges,
-                deliveryOrderFees: rates.qatarClearance.deliveryOrderFees,
+                deliveryOrderFees,
+                terminalHandling,
+                containerReturn,
+                containerMaintenance,
+                terminalInspection: rates.qatarClearance.terminalInspection,
                 inspectionCharge: rates.qatarClearance.inspectionCharge,
                 clearanceAgentFees: rates.qatarClearance.clearanceAgentFees,
-                documentAttestation: rates.qatarClearance.documentAttestation,
-                terminalHandling,
+                documentAttestation: mofaAttestation,
                 localTransport: rates.localTransport,
             };
 
@@ -300,11 +353,21 @@
                 const allocatedCertification = certificationCost * valueRatio;
                 const allocatedInsurance = insurance * valueRatio;
                 
-                const itemLandedCost = itemTotal + allocatedFreight + allocatedQatarCharges + 
+                const itemLandedCost = itemTotal + allocatedFreight + allocatedQatarCharges +
                                        allocatedCertification + allocatedInsurance;
-                const itemMargin = itemLandedCost * settings.profitMargin;
+
+                // Calculate profit margin (percentage or fixed USD)
+                const itemMargin = settings.profitMarginMode === 'percentage'
+                    ? itemLandedCost * settings.profitMargin
+                    : settings.profitMargin * valueRatio;
+
                 const itemWithMargin = itemLandedCost + itemMargin;
-                const itemCommission = itemWithMargin * settings.commissionRate;
+
+                // Calculate commission (percentage or fixed USD)
+                const itemCommission = settings.commissionMode === 'percentage'
+                    ? itemWithMargin * settings.commissionRate
+                    : settings.commissionRate * valueRatio;
+
                 const itemDdpTotal = itemWithMargin + itemCommission;
                 const ddpPerUnit = itemDdpTotal / item.quantity;
 
@@ -583,14 +646,62 @@
                         prefix="$"
                         step="0.01"
                     />
-                    <Input
-                        label={index === 0 ? "CBM/Unit" : null}
-                        type="number"
-                        value={item.cbmPerUnit}
-                        onChange={v => onUpdate(index, 'cbmPerUnit', parseFloat(v) || 0)}
-                        suffix="m³"
-                        step="0.001"
-                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {index === 0 && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                <span style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)' }}>CBM:</span>
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                    <button
+                                        onClick={() => onUpdate(index, 'cbmInputMode', 'unit')}
+                                        style={{
+                                            padding: '4px 10px',
+                                            fontSize: '11px',
+                                            fontWeight: '500',
+                                            border: '1px solid',
+                                            borderColor: item.cbmInputMode === 'unit' ? 'var(--accent-blue)' : 'var(--border)',
+                                            background: item.cbmInputMode === 'unit' ? 'var(--accent-blue)20' : 'transparent',
+                                            color: item.cbmInputMode === 'unit' ? 'var(--accent-blue)' : 'var(--text-muted)',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        /Unit
+                                    </button>
+                                    <button
+                                        onClick={() => onUpdate(index, 'cbmInputMode', 'total')}
+                                        style={{
+                                            padding: '4px 10px',
+                                            fontSize: '11px',
+                                            fontWeight: '500',
+                                            border: '1px solid',
+                                            borderColor: item.cbmInputMode === 'total' ? 'var(--accent-blue)' : 'var(--border)',
+                                            background: item.cbmInputMode === 'total' ? 'var(--accent-blue)20' : 'transparent',
+                                            color: item.cbmInputMode === 'total' ? 'var(--accent-blue)' : 'var(--text-muted)',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Total
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                        <Input
+                            label={null}
+                            type="number"
+                            value={item.cbmInputMode === 'total' ? (item.cbmPerUnit * item.quantity).toFixed(3) : item.cbmPerUnit}
+                            onChange={v => {
+                                const val = parseFloat(v) || 0;
+                                if (item.cbmInputMode === 'total') {
+                                    onUpdate(index, 'cbmPerUnit', item.quantity > 0 ? val / item.quantity : 0);
+                                } else {
+                                    onUpdate(index, 'cbmPerUnit', val);
+                                }
+                            }}
+                            suffix="m³"
+                            step="0.001"
+                        />
+                    </div>
                     <Input
                         label={index === 0 ? "Weight/Unit" : null}
                         type="number"
@@ -676,6 +787,10 @@
                         <CostRow label="Mwani Charges" amount={costs.qatarCharges.mwaniCharges} currency="QAR" indent />
                         <CostRow label="Delivery Order Fees" amount={costs.qatarCharges.deliveryOrderFees} currency="QAR" indent />
                         <CostRow label="Terminal Handling" amount={costs.qatarCharges.terminalHandling} currency="QAR" indent />
+                        <CostRow label="Container Return" amount={costs.qatarCharges.containerReturn} currency="QAR" indent />
+                        <CostRow label="Container Maintenance" amount={costs.qatarCharges.containerMaintenance} currency="QAR" indent />
+                        <CostRow label="Terminal Inspection" amount={costs.qatarCharges.terminalInspection} currency="QAR" indent />
+                        <CostRow label="Inspection Charge" amount={costs.qatarCharges.inspectionCharge} currency="QAR" indent />
                         <CostRow label="Clearance Agent Fees" amount={costs.qatarCharges.clearanceAgentFees} currency="QAR" indent />
                         <CostRow label="Local Transport" amount={costs.qatarCharges.localTransport} currency="QAR" indent />
                         <CostRow label="Document Attestation" amount={costs.qatarCharges.documentAttestation} currency="QAR" indent />
@@ -769,20 +884,23 @@
         const App = () => {
             // Items state
             const [items, setItems] = useState([
-                { description: '', quantity: 1, exwPrice: 0, cbmPerUnit: 0.01, weightPerUnit: 0 }
+                { description: '', quantity: 1, exwPrice: 0, cbmPerUnit: 0.01, weightPerUnit: 0, cbmInputMode: 'unit' }
             ]);
 
             // Settings state
             const [settings, setSettings] = useState({
                 containerType: 'auto',
                 profitMargin: 0.15,
+                profitMarginMode: 'percentage',
                 commissionRate: 0.06,
+                commissionMode: 'percentage',
             });
 
             // Overrides state
             const [overrides, setOverrides] = useState({
                 seaFreightOverride: null,
                 customsDutyRate: null,
+                domesticChinaPerCbmOverride: null,
             });
 
             // Show overrides panel
@@ -790,7 +908,7 @@
 
             // Add new item
             const addItem = () => {
-                setItems([...items, { description: '', quantity: 1, exwPrice: 0, cbmPerUnit: 0.01, weightPerUnit: 0 }]);
+                setItems([...items, { description: '', quantity: 1, exwPrice: 0, cbmPerUnit: 0.01, weightPerUnit: 0, cbmInputMode: 'unit' }]);
             };
 
             // Update item
@@ -908,26 +1026,102 @@
                                         ]}
                                         hint="Auto will optimize based on total volume"
                                     />
-                                    <Input
-                                        label="Profit Margin"
-                                        type="number"
-                                        value={(settings.profitMargin * 100).toFixed(0)}
-                                        onChange={v => setSettings({ ...settings, profitMargin: parseFloat(v) / 100 || 0 })}
-                                        suffix="%"
-                                        min="0"
-                                        max="50"
-                                        hint="Applied to landed cost"
-                                    />
-                                    <Input
-                                        label="Commission Rate"
-                                        type="number"
-                                        value={(settings.commissionRate * 100).toFixed(0)}
-                                        onChange={v => setSettings({ ...settings, commissionRate: parseFloat(v) / 100 || 0 })}
-                                        suffix="%"
-                                        min="0"
-                                        max="15"
-                                        hint="Sales agent commission (4-10% typical)"
-                                    />
+                                    <div style={{ marginBottom: '16px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                            <span style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)' }}>Profit Margin:</span>
+                                            <div style={{ display: 'flex', gap: '4px' }}>
+                                                <button
+                                                    onClick={() => setSettings({ ...settings, profitMarginMode: 'percentage', profitMargin: 0.15 })}
+                                                    style={{
+                                                        padding: '4px 10px',
+                                                        fontSize: '11px',
+                                                        fontWeight: '500',
+                                                        border: '1px solid',
+                                                        borderColor: settings.profitMarginMode === 'percentage' ? 'var(--accent-cyan)' : 'var(--border)',
+                                                        background: settings.profitMarginMode === 'percentage' ? 'var(--accent-cyan)20' : 'transparent',
+                                                        color: settings.profitMarginMode === 'percentage' ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                                                        borderRadius: '4px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    %
+                                                </button>
+                                                <button
+                                                    onClick={() => setSettings({ ...settings, profitMarginMode: 'fixed', profitMargin: 100 })}
+                                                    style={{
+                                                        padding: '4px 10px',
+                                                        fontSize: '11px',
+                                                        fontWeight: '500',
+                                                        border: '1px solid',
+                                                        borderColor: settings.profitMarginMode === 'fixed' ? 'var(--accent-cyan)' : 'var(--border)',
+                                                        background: settings.profitMarginMode === 'fixed' ? 'var(--accent-cyan)20' : 'transparent',
+                                                        color: settings.profitMarginMode === 'fixed' ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                                                        borderRadius: '4px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    USD
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <Input
+                                            label={null}
+                                            type="number"
+                                            value={settings.profitMarginMode === 'percentage' ? (settings.profitMargin * 100).toFixed(0) : settings.profitMargin.toFixed(2)}
+                                            onChange={v => setSettings({ ...settings, profitMargin: settings.profitMarginMode === 'percentage' ? (parseFloat(v) / 100 || 0) : (parseFloat(v) || 0) })}
+                                            suffix={settings.profitMarginMode === 'percentage' ? '%' : 'USD'}
+                                            min="0"
+                                            hint={settings.profitMarginMode === 'percentage' ? 'Applied to landed cost' : 'Fixed amount in USD'}
+                                        />
+                                    </div>
+                                    <div style={{ marginBottom: '16px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                            <span style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)' }}>Commission:</span>
+                                            <div style={{ display: 'flex', gap: '4px' }}>
+                                                <button
+                                                    onClick={() => setSettings({ ...settings, commissionMode: 'percentage', commissionRate: 0.06 })}
+                                                    style={{
+                                                        padding: '4px 10px',
+                                                        fontSize: '11px',
+                                                        fontWeight: '500',
+                                                        border: '1px solid',
+                                                        borderColor: settings.commissionMode === 'percentage' ? 'var(--accent-cyan)' : 'var(--border)',
+                                                        background: settings.commissionMode === 'percentage' ? 'var(--accent-cyan)20' : 'transparent',
+                                                        color: settings.commissionMode === 'percentage' ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                                                        borderRadius: '4px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    %
+                                                </button>
+                                                <button
+                                                    onClick={() => setSettings({ ...settings, commissionMode: 'fixed', commissionRate: 50 })}
+                                                    style={{
+                                                        padding: '4px 10px',
+                                                        fontSize: '11px',
+                                                        fontWeight: '500',
+                                                        border: '1px solid',
+                                                        borderColor: settings.commissionMode === 'fixed' ? 'var(--accent-cyan)' : 'var(--border)',
+                                                        background: settings.commissionMode === 'fixed' ? 'var(--accent-cyan)20' : 'transparent',
+                                                        color: settings.commissionMode === 'fixed' ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                                                        borderRadius: '4px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    USD
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <Input
+                                            label={null}
+                                            type="number"
+                                            value={settings.commissionMode === 'percentage' ? (settings.commissionRate * 100).toFixed(0) : settings.commissionRate.toFixed(2)}
+                                            onChange={v => setSettings({ ...settings, commissionRate: settings.commissionMode === 'percentage' ? (parseFloat(v) / 100 || 0) : (parseFloat(v) || 0) })}
+                                            suffix={settings.commissionMode === 'percentage' ? '%' : 'USD'}
+                                            min="0"
+                                            hint={settings.commissionMode === 'percentage' ? 'Sales agent commission (4-10% typical)' : 'Fixed amount in USD'}
+                                        />
+                                    </div>
                                 </Card>
 
                                 {/* Rate Overrides */}
@@ -942,6 +1136,15 @@
                                         onChange={v => setOverrides({ ...overrides, seaFreightOverride: v ? parseFloat(v) : null })}
                                         prefix="$"
                                         hint="Leave empty to use average rates"
+                                    />
+                                    <Input
+                                        label="Domestic China Shipping"
+                                        type="number"
+                                        value={overrides.domesticChinaPerCbmOverride || ''}
+                                        onChange={v => setOverrides({ ...overrides, domesticChinaPerCbmOverride: v ? parseFloat(v) : null })}
+                                        prefix="$"
+                                        suffix="per CBM"
+                                        hint={`Default: $${DEFAULT_RATES.domesticChinaPerCbm} per CBM`}
                                     />
                                     <div style={{ marginTop: '16px', padding: '12px', background: 'var(--bg-secondary)', borderRadius: '8px' }}>
                                         <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>Default Sea Freight Rates:</p>
@@ -962,11 +1165,15 @@
                                         {[
                                             ['Customs Duty', '5% of CIF'],
                                             ['Mwani Charges', 'QAR 160'],
-                                            ['Delivery Order', 'QAR 2,150'],
-                                            ['THC (40HC)', 'QAR 900'],
+                                            ['Delivery Order (40HC)', 'QAR 1,100'],
+                                            ['THC (40HC)', 'QAR 1,100'],
+                                            ['Container Return (40HC)', 'QAR 380'],
+                                            ['Container Maint. (40HC)', 'QAR 40.04'],
+                                            ['Terminal Inspection', 'QAR 35'],
+                                            ['Inspection Charge', 'QAR 50'],
                                             ['Clearance Agent', 'QAR 250'],
                                             ['Local Transport', 'QAR 800'],
-                                            ['Doc Attestation', 'QAR 100'],
+                                            ['MOFA Attestation', 'Tiered by value'],
                                         ].map(([label, value], i) => (
                                             <div key={i} style={{
                                                 display: 'flex',
