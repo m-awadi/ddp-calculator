@@ -1,0 +1,791 @@
+import { useState } from 'react';
+import QuotationItemRow from './components/QuotationItemRow';
+import { generateQuotationPDF } from './utils/quotationPDF';
+import { generateQuotationHTML } from './utils/quotationHTML';
+import {
+    DEFAULT_COMPANY_INFO,
+    DEFAULT_DELIVERY_TERMS,
+    DEFAULT_TIMELINE_TERMS,
+    DEFAULT_PAYMENT_TERMS,
+    DEFAULT_BANK_DETAILS,
+    QUOTATION_COLORS
+} from './utils/defaultTerms';
+
+const QuotationApp = ({ initialItems = [], onClose }) => {
+    const [quotationDate, setQuotationDate] = useState(new Date().toISOString().slice(0, 10));
+    const [showPictureColumn, setShowPictureColumn] = useState(true);
+    const [quantityUnit, setQuantityUnit] = useState('pcs');
+    const [items, setItems] = useState(
+        initialItems.length > 0
+            ? initialItems.map(item => ({
+                description: item.description || '',
+                quantity: item.quantity || 0,
+                price: item.ddpPerUnit || 0,
+                image: null
+            }))
+            : [{ description: '', quantity: 0, price: 0, image: null }]
+    );
+
+    const [companyInfo, setCompanyInfo] = useState({ ...DEFAULT_COMPANY_INFO });
+    const [deliveryTerms, setDeliveryTerms] = useState([...DEFAULT_DELIVERY_TERMS]);
+    const [timelineTerms, setTimelineTerms] = useState([...DEFAULT_TIMELINE_TERMS]);
+    const [paymentTerms, setPaymentTerms] = useState([...DEFAULT_PAYMENT_TERMS]);
+    const [bankDetails, setBankDetails] = useState({ ...DEFAULT_BANK_DETAILS });
+
+    // Custom blocks - flexible sections that can be added after the table
+    const [customBlocks, setCustomBlocks] = useState([]);
+
+    const updateItem = (index, field, value) => {
+        const newItems = [...items];
+        newItems[index][field] = value;
+        setItems(newItems);
+    };
+
+    const addItem = () => {
+        setItems([...items, { description: '', quantity: 0, price: 0, image: null }]);
+    };
+
+    const removeItem = (index) => {
+        if (items.length > 1) {
+            setItems(items.filter((_, i) => i !== index));
+        }
+    };
+
+    const addTerm = (section) => {
+        if (section === 'delivery') setDeliveryTerms([...deliveryTerms, '']);
+        if (section === 'timeline') setTimelineTerms([...timelineTerms, '']);
+        if (section === 'payment') setPaymentTerms([...paymentTerms, '']);
+    };
+
+    const updateTerm = (section, index, value) => {
+        if (section === 'delivery') {
+            const newTerms = [...deliveryTerms];
+            newTerms[index] = value;
+            setDeliveryTerms(newTerms);
+        }
+        if (section === 'timeline') {
+            const newTerms = [...timelineTerms];
+            newTerms[index] = value;
+            setTimelineTerms(newTerms);
+        }
+        if (section === 'payment') {
+            const newTerms = [...paymentTerms];
+            newTerms[index] = value;
+            setPaymentTerms(newTerms);
+        }
+    };
+
+    const removeTerm = (section, index) => {
+        if (section === 'delivery' && deliveryTerms.length > 1) {
+            setDeliveryTerms(deliveryTerms.filter((_, i) => i !== index));
+        }
+        if (section === 'timeline' && timelineTerms.length > 1) {
+            setTimelineTerms(timelineTerms.filter((_, i) => i !== index));
+        }
+        if (section === 'payment' && paymentTerms.length > 1) {
+            setPaymentTerms(paymentTerms.filter((_, i) => i !== index));
+        }
+    };
+
+    const totalUSD = items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+    const totalQAR = totalUSD * 3.65; // Keep for backward compatibility
+
+    // Custom blocks management
+    const addCustomBlock = () => {
+        setCustomBlocks([...customBlocks, {
+            id: Date.now(),
+            title: '',
+            sections: [{ id: Date.now() + 1, title: '', items: [''] }]
+        }]);
+    };
+
+    const removeCustomBlock = (blockIndex) => {
+        setCustomBlocks(customBlocks.filter((_, i) => i !== blockIndex));
+    };
+
+    const updateBlockTitle = (blockIndex, title) => {
+        const newBlocks = [...customBlocks];
+        newBlocks[blockIndex].title = title;
+        setCustomBlocks(newBlocks);
+    };
+
+    const addSection = (blockIndex) => {
+        const newBlocks = [...customBlocks];
+        newBlocks[blockIndex].sections.push({ id: Date.now(), title: '', items: [''] });
+        setCustomBlocks(newBlocks);
+    };
+
+    const removeSection = (blockIndex, sectionIndex) => {
+        const newBlocks = [...customBlocks];
+        if (newBlocks[blockIndex].sections.length > 1) {
+            newBlocks[blockIndex].sections = newBlocks[blockIndex].sections.filter((_, i) => i !== sectionIndex);
+            setCustomBlocks(newBlocks);
+        }
+    };
+
+    const updateSectionTitle = (blockIndex, sectionIndex, title) => {
+        const newBlocks = [...customBlocks];
+        newBlocks[blockIndex].sections[sectionIndex].title = title;
+        setCustomBlocks(newBlocks);
+    };
+
+    const addBlockItem = (blockIndex, sectionIndex) => {
+        const newBlocks = [...customBlocks];
+        newBlocks[blockIndex].sections[sectionIndex].items.push('');
+        setCustomBlocks(newBlocks);
+    };
+
+    const removeBlockItem = (blockIndex, sectionIndex, itemIndex) => {
+        const newBlocks = [...customBlocks];
+        if (newBlocks[blockIndex].sections[sectionIndex].items.length > 1) {
+            newBlocks[blockIndex].sections[sectionIndex].items = newBlocks[blockIndex].sections[sectionIndex].items.filter((_, i) => i !== itemIndex);
+            setCustomBlocks(newBlocks);
+        }
+    };
+
+    const updateBlockItem = (blockIndex, sectionIndex, itemIndex, value) => {
+        const newBlocks = [...customBlocks];
+        newBlocks[blockIndex].sections[sectionIndex].items[itemIndex] = value;
+        setCustomBlocks(newBlocks);
+    };
+
+    const handleGeneratePDF = async () => {
+        try {
+            await generateQuotationPDF({
+                date: quotationDate,
+                items,
+                totalQAR,
+                totalUSD,
+                companyInfo,
+                deliveryTerms,
+                timelineTerms,
+                paymentTerms,
+                bankDetails,
+                showPictureColumn,
+                customBlocks,
+                quantityUnit
+            });
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            alert('Error generating PDF. Please check the console for details.');
+        }
+    };
+
+    const handlePrintToPDF = () => {
+        try {
+            generateQuotationHTML({
+                date: quotationDate,
+                items,
+                totalQAR,
+                totalUSD,
+                companyInfo,
+                deliveryTerms,
+                timelineTerms,
+                paymentTerms,
+                bankDetails,
+                showPictureColumn,
+                customBlocks,
+                quantityUnit
+            });
+        } catch (error) {
+            console.error('Error generating print preview:', error);
+            alert('Error generating print preview. Please check the console for details.');
+        }
+    };
+
+    return (
+        <div style={{
+            minHeight: '100vh',
+            background: QUOTATION_COLORS.background,
+            padding: '24px'
+        }}>
+            {/* Header */}
+            <div style={{
+                maxWidth: '1400px',
+                margin: '0 auto',
+                background: QUOTATION_COLORS.white,
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                overflow: 'hidden'
+            }}>
+                {/* Top Bar */}
+                <div style={{
+                    background: QUOTATION_COLORS.primary,
+                    padding: '16px 24px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                }}>
+                    <h1 style={{
+                        fontSize: '24px',
+                        fontWeight: '700',
+                        color: QUOTATION_COLORS.white,
+                        margin: 0
+                    }}>
+                        Quotation Builder
+                    </h1>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                        <button
+                            onClick={handlePrintToPDF}
+                            style={{
+                                padding: '10px 20px',
+                                background: QUOTATION_COLORS.primary,
+                                color: QUOTATION_COLORS.white,
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                cursor: 'pointer'
+                            }}
+                            title="Perfect Arabic support - Print to PDF using browser"
+                        >
+                            🖨️ Print to PDF (Recommended)
+                        </button>
+                        <button
+                            onClick={handleGeneratePDF}
+                            style={{
+                                padding: '10px 20px',
+                                background: QUOTATION_COLORS.secondary,
+                                color: QUOTATION_COLORS.white,
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                opacity: 0.7
+                            }}
+                            title="Direct PDF download - Limited Arabic support"
+                        >
+                            📄 Direct PDF
+                        </button>
+                        {onClose && (
+                            <button
+                                onClick={onClose}
+                                style={{
+                                    padding: '10px 20px',
+                                    background: QUOTATION_COLORS.white,
+                                    color: QUOTATION_COLORS.primary,
+                                    border: `2px solid ${QUOTATION_COLORS.white}`,
+                                    borderRadius: '6px',
+                                    fontSize: '14px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                ← Back to DDP
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Content */}
+                <div style={{ padding: '24px' }}>
+                    {/* Company Info */}
+                    <div style={{ marginBottom: '24px' }}>
+                        <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: QUOTATION_COLORS.textDark }}>
+                            Company Information
+                        </h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                            <input
+                                type="text"
+                                value={companyInfo.name}
+                                onChange={(e) => setCompanyInfo({ ...companyInfo, name: e.target.value })}
+                                placeholder="Company Name"
+                                style={{
+                                    padding: '10px',
+                                    border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                    borderRadius: '6px',
+                                    fontSize: '14px'
+                                }}
+                            />
+                            <input
+                                type="date"
+                                value={quotationDate}
+                                onChange={(e) => setQuotationDate(e.target.value)}
+                                style={{
+                                    padding: '10px',
+                                    border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                    borderRadius: '6px',
+                                    fontSize: '14px'
+                                }}
+                            />
+                            <textarea
+                                value={companyInfo.address}
+                                onChange={(e) => setCompanyInfo({ ...companyInfo, address: e.target.value })}
+                                placeholder="Address"
+                                rows="3"
+                                style={{
+                                    padding: '10px',
+                                    border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                    borderRadius: '6px',
+                                    fontSize: '14px',
+                                    fontFamily: 'inherit',
+                                    gridColumn: '1 / -1'
+                                }}
+                            />
+                            <input
+                                type="email"
+                                value={companyInfo.email}
+                                onChange={(e) => setCompanyInfo({ ...companyInfo, email: e.target.value })}
+                                placeholder="Email"
+                                style={{
+                                    padding: '10px',
+                                    border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                    borderRadius: '6px',
+                                    fontSize: '14px'
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Items Table */}
+                    <div style={{ marginBottom: '24px', overflowX: 'auto' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <h3 style={{ fontSize: '16px', fontWeight: '600', margin: 0, color: QUOTATION_COLORS.textDark }}>
+                                Quotation Items
+                            </h3>
+                            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: QUOTATION_COLORS.textDark }}>
+                                    <span>Qty Unit:</span>
+                                    <input
+                                        type="text"
+                                        value={quantityUnit}
+                                        onChange={(e) => setQuantityUnit(e.target.value)}
+                                        placeholder="pcs"
+                                        style={{
+                                            width: '80px',
+                                            padding: '6px 8px',
+                                            border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                            borderRadius: '4px',
+                                            fontSize: '13px'
+                                        }}
+                                    />
+                                </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: QUOTATION_COLORS.textDark, cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={showPictureColumn}
+                                        onChange={(e) => setShowPictureColumn(e.target.checked)}
+                                        style={{ cursor: 'pointer' }}
+                                    />
+                                    Show Picture Column
+                                </label>
+                            </div>
+                        </div>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                                <tr style={{ background: QUOTATION_COLORS.primary }}>
+                                    <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600', textAlign: 'center' }}>Item</th>
+                                    {showPictureColumn && <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}>Picture</th>}
+                                    <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}>Description</th>
+                                    <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}>Qty ({quantityUnit})</th>
+                                    <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}>Price (USD)</th>
+                                    <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}>Total (USD)</th>
+                                    <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {items.map((item, index) => (
+                                    <QuotationItemRow
+                                        key={index}
+                                        item={item}
+                                        index={index}
+                                        onUpdate={updateItem}
+                                        onRemove={removeItem}
+                                        showPictureColumn={showPictureColumn}
+                                    />
+                                ))}
+                                {/* Total Row */}
+                                <tr style={{ background: QUOTATION_COLORS.primary }}>
+                                    <td colSpan={showPictureColumn ? "5" : "4"} style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '14px', fontWeight: '700', textAlign: 'right' }}>
+                                        Total
+                                    </td>
+                                    <td style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '14px', fontWeight: '700', textAlign: 'right' }}>
+                                        ${totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <button
+                            onClick={addItem}
+                            style={{
+                                marginTop: '12px',
+                                padding: '10px 20px',
+                                background: `${QUOTATION_COLORS.primary}20`,
+                                color: QUOTATION_COLORS.primary,
+                                border: `1px dashed ${QUOTATION_COLORS.primary}`,
+                                borderRadius: '6px',
+                                fontSize: '14px',
+                                fontWeight: '500',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            + Add Item
+                        </button>
+                    </div>
+
+                    {/* Custom Blocks - Flexible sections after table */}
+                    <div style={{ marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <h3 style={{ fontSize: '16px', fontWeight: '600', margin: 0, color: QUOTATION_COLORS.textDark }}>
+                                Custom Sections (After Table)
+                            </h3>
+                            <button
+                                onClick={addCustomBlock}
+                                style={{
+                                    padding: '8px 16px',
+                                    background: `${QUOTATION_COLORS.primary}`,
+                                    color: QUOTATION_COLORS.white,
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    fontSize: '13px',
+                                    fontWeight: '500',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                + Add Custom Block
+                            </button>
+                        </div>
+
+                        {customBlocks.map((block, blockIdx) => (
+                            <div key={block.id} style={{
+                                marginBottom: '20px',
+                                padding: '16px',
+                                border: `2px solid ${QUOTATION_COLORS.primary}40`,
+                                borderRadius: '8px',
+                                background: `${QUOTATION_COLORS.primary}05`
+                            }}>
+                                {/* Block Title */}
+                                <div style={{ marginBottom: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <input
+                                        type="text"
+                                        value={block.title}
+                                        onChange={(e) => updateBlockTitle(blockIdx, e.target.value)}
+                                        placeholder="Block Title (e.g., معلومات خاصة بالعرض:)"
+                                        style={{
+                                            flex: 1,
+                                            padding: '10px',
+                                            border: `2px solid ${QUOTATION_COLORS.primary}`,
+                                            borderRadius: '6px',
+                                            fontSize: '14px',
+                                            fontWeight: '600',
+                                            color: QUOTATION_COLORS.primary
+                                        }}
+                                    />
+                                    <button
+                                        onClick={() => removeCustomBlock(blockIdx)}
+                                        style={{
+                                            padding: '8px 12px',
+                                            background: '#EF444420',
+                                            border: '1px solid #EF444440',
+                                            borderRadius: '6px',
+                                            color: '#EF4444',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            fontWeight: '500'
+                                        }}
+                                    >
+                                        Delete Block
+                                    </button>
+                                </div>
+
+                                {/* Sections */}
+                                {block.sections.map((section, sectionIdx) => (
+                                    <div key={section.id} style={{
+                                        marginBottom: '12px',
+                                        padding: '12px',
+                                        background: QUOTATION_COLORS.white,
+                                        borderRadius: '6px',
+                                        border: `1px solid ${QUOTATION_COLORS.textMuted}40`
+                                    }}>
+                                        {/* Section Title */}
+                                        <div style={{ marginBottom: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                            <span style={{ fontWeight: '600', fontSize: '14px' }}>●</span>
+                                            <input
+                                                type="text"
+                                                value={section.title}
+                                                onChange={(e) => updateSectionTitle(blockIdx, sectionIdx, e.target.value)}
+                                                placeholder="Section Title (e.g., التسليم:)"
+                                                style={{
+                                                    flex: 1,
+                                                    padding: '8px',
+                                                    border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                                    borderRadius: '6px',
+                                                    fontSize: '13px',
+                                                    fontWeight: '600'
+                                                }}
+                                            />
+                                            <button
+                                                onClick={() => removeSection(blockIdx, sectionIdx)}
+                                                style={{
+                                                    padding: '6px 10px',
+                                                    background: '#EF444420',
+                                                    border: '1px solid #EF444440',
+                                                    borderRadius: '6px',
+                                                    color: '#EF4444',
+                                                    cursor: 'pointer',
+                                                    fontSize: '12px'
+                                                }}
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+
+                                        {/* Sub-items */}
+                                        {section.items.map((item, itemIdx) => (
+                                            <div key={itemIdx} style={{ marginBottom: '6px', display: 'flex', gap: '8px', alignItems: 'center', marginLeft: '24px' }}>
+                                                <span style={{ fontSize: '12px', color: QUOTATION_COLORS.textMuted }}>○</span>
+                                                <textarea
+                                                    value={item}
+                                                    onChange={(e) => updateBlockItem(blockIdx, sectionIdx, itemIdx, e.target.value)}
+                                                    placeholder="Sub-item text..."
+                                                    rows="2"
+                                                    style={{
+                                                        flex: 1,
+                                                        padding: '6px',
+                                                        border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                                        borderRadius: '4px',
+                                                        fontSize: '12px',
+                                                        fontFamily: 'inherit',
+                                                        resize: 'vertical'
+                                                    }}
+                                                />
+                                                <button
+                                                    onClick={() => removeBlockItem(blockIdx, sectionIdx, itemIdx)}
+                                                    style={{
+                                                        padding: '4px 8px',
+                                                        background: '#EF444420',
+                                                        border: '1px solid #EF444440',
+                                                        borderRadius: '4px',
+                                                        color: '#EF4444',
+                                                        cursor: 'pointer',
+                                                        fontSize: '11px'
+                                                    }}
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        ))}
+
+                                        <button
+                                            onClick={() => addBlockItem(blockIdx, sectionIdx)}
+                                            style={{
+                                                marginLeft: '24px',
+                                                marginTop: '6px',
+                                                padding: '6px 12px',
+                                                background: `${QUOTATION_COLORS.primary}20`,
+                                                color: QUOTATION_COLORS.primary,
+                                                border: `1px dashed ${QUOTATION_COLORS.primary}`,
+                                                borderRadius: '4px',
+                                                fontSize: '11px',
+                                                fontWeight: '500',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            + Add Sub-item
+                                        </button>
+                                    </div>
+                                ))}
+
+                                <button
+                                    onClick={() => addSection(blockIdx)}
+                                    style={{
+                                        padding: '8px 16px',
+                                        background: `${QUOTATION_COLORS.primary}20`,
+                                        color: QUOTATION_COLORS.primary,
+                                        border: `1px dashed ${QUOTATION_COLORS.primary}`,
+                                        borderRadius: '6px',
+                                        fontSize: '12px',
+                                        fontWeight: '500',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    + Add Section (● Bullet)
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Terms Sections - Fixed blocks right below dynamic blocks */}
+                    <div style={{ marginBottom: '24px' }}>
+                        <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: QUOTATION_COLORS.textDark }}>
+                            Fixed Terms & Bank Details
+                        </h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                        {/* Delivery Terms */}
+                        <TermsSection
+                            title="التسليم (Delivery)"
+                            terms={deliveryTerms}
+                            onUpdate={(index, value) => updateTerm('delivery', index, value)}
+                            onAdd={() => addTerm('delivery')}
+                            onRemove={(index) => removeTerm('delivery', index)}
+                        />
+
+                        {/* Timeline Terms */}
+                        <TermsSection
+                            title="المدة الزمنية (Timeline)"
+                            terms={timelineTerms}
+                            onUpdate={(index, value) => updateTerm('timeline', index, value)}
+                            onAdd={() => addTerm('timeline')}
+                            onRemove={(index) => removeTerm('timeline', index)}
+                        />
+
+                        {/* Payment Terms */}
+                        <TermsSection
+                            title="الدفع (Payment)"
+                            terms={paymentTerms}
+                            onUpdate={(index, value) => updateTerm('payment', index, value)}
+                            onAdd={() => addTerm('payment')}
+                            onRemove={(index) => removeTerm('payment', index)}
+                        />
+
+                        {/* Bank Details */}
+                        <div>
+                            <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: QUOTATION_COLORS.textDark }}>
+                                التحويلات (Bank Transfers)
+                            </h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <input
+                                    type="text"
+                                    value={bankDetails.accountName}
+                                    onChange={(e) => setBankDetails({ ...bankDetails, accountName: e.target.value })}
+                                    placeholder="Account Name"
+                                    style={{
+                                        padding: '8px',
+                                        border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                        borderRadius: '6px',
+                                        fontSize: '13px'
+                                    }}
+                                />
+                                <input
+                                    type="text"
+                                    value={bankDetails.accountNumber}
+                                    onChange={(e) => setBankDetails({ ...bankDetails, accountNumber: e.target.value })}
+                                    placeholder="Account Number/IBAN"
+                                    style={{
+                                        padding: '8px',
+                                        border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                        borderRadius: '6px',
+                                        fontSize: '13px'
+                                    }}
+                                />
+                                <input
+                                    type="text"
+                                    value={bankDetails.bankName}
+                                    onChange={(e) => setBankDetails({ ...bankDetails, bankName: e.target.value })}
+                                    placeholder="Bank Name"
+                                    style={{
+                                        padding: '8px',
+                                        border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                        borderRadius: '6px',
+                                        fontSize: '13px'
+                                    }}
+                                />
+                                <input
+                                    type="text"
+                                    value={bankDetails.swiftBic}
+                                    onChange={(e) => setBankDetails({ ...bankDetails, swiftBic: e.target.value })}
+                                    placeholder="SWIFT/BIC"
+                                    style={{
+                                        padding: '8px',
+                                        border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                        borderRadius: '6px',
+                                        fontSize: '13px'
+                                    }}
+                                />
+                                <input
+                                    type="text"
+                                    value={bankDetails.bankAddress}
+                                    onChange={(e) => setBankDetails({ ...bankDetails, bankAddress: e.target.value })}
+                                    placeholder="Bank Address"
+                                    style={{
+                                        padding: '8px',
+                                        border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                        borderRadius: '6px',
+                                        fontSize: '13px'
+                                    }}
+                                />
+                                <input
+                                    type="text"
+                                    value={bankDetails.bankCountry}
+                                    onChange={(e) => setBankDetails({ ...bankDetails, bankCountry: e.target.value })}
+                                    placeholder="Bank Country"
+                                    style={{
+                                        padding: '8px',
+                                        border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                        borderRadius: '6px',
+                                        fontSize: '13px'
+                                    }}
+                                />
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const TermsSection = ({ title, terms, onUpdate, onAdd, onRemove }) => {
+    return (
+        <div>
+            <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: QUOTATION_COLORS.textDark }}>
+                {title}
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {terms.map((term, index) => (
+                    <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <textarea
+                            value={term}
+                            onChange={(e) => onUpdate(index, e.target.value)}
+                            placeholder="Enter term..."
+                            rows="2"
+                            style={{
+                                flex: 1,
+                                padding: '8px',
+                                border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                borderRadius: '6px',
+                                fontSize: '13px',
+                                fontFamily: 'inherit',
+                                resize: 'vertical'
+                            }}
+                        />
+                        <button
+                            onClick={() => onRemove(index)}
+                            style={{
+                                padding: '6px 10px',
+                                background: '#EF444420',
+                                border: '1px solid #EF444440',
+                                borderRadius: '6px',
+                                color: '#EF4444',
+                                cursor: 'pointer',
+                                fontSize: '14px'
+                            }}
+                        >
+                            ✕
+                        </button>
+                    </div>
+                ))}
+                <button
+                    onClick={onAdd}
+                    style={{
+                        padding: '8px 16px',
+                        background: `${QUOTATION_COLORS.primary}20`,
+                        color: QUOTATION_COLORS.primary,
+                        border: `1px dashed ${QUOTATION_COLORS.primary}`,
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        cursor: 'pointer'
+                    }}
+                >
+                    + Add Term
+                </button>
+            </div>
+        </div>
+    );
+};
+
+export default QuotationApp;
