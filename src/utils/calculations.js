@@ -258,6 +258,26 @@ export const calculateDDP = (items, settings, overrides = {}) => {
         };
     });
 
+    // Calculate container utilization percentage
+    let totalCapacity = 0;
+    let fullContainerCapacity = 0;
+
+    containers.forEach(type => {
+        if (type !== 'LCL') {
+            const capacity = CONTAINER_SPECS[type]?.cbm || 76;
+            totalCapacity += capacity;
+            fullContainerCapacity += capacity;
+        }
+    });
+
+    // If LCL is present, add only the remaining CBM (not full shipment)
+    if (containers.includes('LCL')) {
+        const lclCbm = totalCbm - fullContainerCapacity;
+        totalCapacity += lclCbm;
+    }
+
+    const containerUtilization = totalCapacity > 0 ? (totalCbm / totalCapacity) * 100 : 0;
+
     return {
         summary: {
             totalItems: items.length,
@@ -266,6 +286,8 @@ export const calculateDDP = (items, settings, overrides = {}) => {
             totalWeight,
             containers,
             totalExwCost,
+            containerCount: containers.length,
+            containerUtilization,
         },
         costs: {
             totalExwCost,

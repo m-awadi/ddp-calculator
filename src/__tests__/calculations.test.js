@@ -297,4 +297,151 @@ describe('calculations', () => {
             expect(result.costs.cifValueQar).toBeCloseTo(result.costs.cifWithInsurance * 3.65, 2);
         });
     });
+
+    describe('Container Utilization Calculation', () => {
+        const defaultSettings = {
+            containerType: 'auto',
+            profitMargin: 0.15,
+            profitMarginMode: 'percentage',
+            commissionRate: 0.06,
+            commissionMode: 'percentage',
+        };
+
+        it('should calculate utilization for a single 20GP container', () => {
+            const item = {
+                description: 'Test Product',
+                quantity: 100,
+                exwPrice: 10,
+                cbmPerUnit: 0.2, // 20 CBM total
+                weightPerUnit: 5,
+            };
+
+            const result = calculateDDP([item], defaultSettings);
+
+            // 20GP container has 33 CBM capacity
+            // 20 CBM / 33 CBM = 60.6%
+            expect(result.summary.containerUtilization).toBeCloseTo(60.6, 1);
+            expect(result.summary.containers).toEqual(['20GP']);
+        });
+
+        it('should calculate utilization for two 20GP containers', () => {
+            const item = {
+                description: 'Test Product',
+                quantity: 100,
+                exwPrice: 10,
+                cbmPerUnit: 0.65, // 65 CBM total
+                weightPerUnit: 5,
+            };
+
+            const result = calculateDDP([item], defaultSettings);
+
+            // Selects 2x 20GP containers (33 + 33 = 66 CBM capacity)
+            // 65 CBM / 66 CBM = 98.48%
+            expect(result.summary.containerUtilization).toBeCloseTo(98.48, 1);
+            expect(result.summary.containers).toEqual(['20GP', '20GP']);
+        });
+
+        it('should calculate utilization for a 40GP with LCL', () => {
+            const item = {
+                description: 'Test Product',
+                quantity: 100,
+                exwPrice: 10,
+                cbmPerUnit: 0.75, // 75 CBM total
+                weightPerUnit: 5,
+            };
+
+            const result = calculateDDP([item], defaultSettings);
+
+            // Selects 40GP (67) + LCL (8) = 75 CBM capacity
+            // 75 CBM / 75 CBM = 100%
+            expect(result.summary.containerUtilization).toBe(100);
+            expect(result.summary.containers).toEqual(['40GP', 'LCL']);
+        });
+
+        it('should calculate 100% utilization for LCL shipments', () => {
+            const item = {
+                description: 'Test Product',
+                quantity: 10,
+                exwPrice: 10,
+                cbmPerUnit: 0.5, // 5 CBM total (LCL threshold)
+                weightPerUnit: 5,
+            };
+
+            const result = calculateDDP([item], defaultSettings);
+
+            // LCL is always 100% utilized
+            expect(result.summary.containerUtilization).toBe(100);
+            expect(result.summary.containers).toEqual(['LCL']);
+        });
+
+        it('should calculate utilization for multiple containers', () => {
+            const item = {
+                description: 'Test Product',
+                quantity: 1000,
+                exwPrice: 10,
+                cbmPerUnit: 0.15, // 150 CBM total
+                weightPerUnit: 5,
+            };
+
+            const result = calculateDDP([item], defaultSettings);
+
+            // Should use 3 containers: 40HC (76) + 40GP (67) + LCL (7) = 150 CBM capacity
+            // 150 CBM / 150 CBM = 100%
+            expect(result.summary.containers.length).toBe(3);
+            expect(result.summary.containerUtilization).toBe(100);
+        });
+
+        it('should respect manual container selection for utilization', () => {
+            const item = {
+                description: 'Test Product',
+                quantity: 100,
+                exwPrice: 10,
+                cbmPerUnit: 0.2, // 20 CBM total
+                weightPerUnit: 5,
+            };
+
+            const settingsWithManualContainer = {
+                ...defaultSettings,
+                containerType: '40HC',
+            };
+
+            const result = calculateDDP([item], settingsWithManualContainer);
+
+            // Manual 40HC selected, 20 CBM / 76 CBM = 26.3%
+            expect(result.summary.containerUtilization).toBeCloseTo(26.3, 1);
+            expect(result.summary.containers).toEqual(['40HC']);
+        });
+
+        it('should always include containerUtilization in summary', () => {
+            const item = {
+                description: 'Test Product',
+                quantity: 50,
+                exwPrice: 10,
+                cbmPerUnit: 0.5, // 25 CBM total
+                weightPerUnit: 5,
+            };
+
+            const result = calculateDDP([item], defaultSettings);
+
+            expect(result.summary).toHaveProperty('containerUtilization');
+            expect(typeof result.summary.containerUtilization).toBe('number');
+            expect(result.summary.containerUtilization).toBeGreaterThan(0);
+            expect(result.summary.containerUtilization).toBeLessThanOrEqual(100);
+        });
+
+        it('should handle edge case with zero capacity gracefully', () => {
+            // This shouldn't happen in practice, but test defensive code
+            const item = {
+                description: 'Test Product',
+                quantity: 0,
+                exwPrice: 10,
+                cbmPerUnit: 0,
+                weightPerUnit: 5,
+            };
+
+            const result = calculateDDP([item], defaultSettings);
+
+            expect(result.summary.containerUtilization).toBe(0);
+        });
+    });
 });
