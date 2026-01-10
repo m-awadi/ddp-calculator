@@ -60,7 +60,7 @@ export const generateQuotationPDF = async (data) => {
 
     // Load logo and footer images
     const logoImage = await loadImageAsBase64('/logo-standalone-web.png');
-    const footerImage = await loadImageAsBase64('/page_footer.png');
+    const footerImage = await loadImageAsBase64('/footer.png');
 
     let yPos = margin;
 

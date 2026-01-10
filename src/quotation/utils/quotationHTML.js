@@ -211,6 +211,20 @@ export const generateQuotationHTML = (data) => {
             font-size: 11px;
         }
 
+        .footer-bar {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            max-height: 80px;
+            max-width: 300px;
+            object-fit: contain;
+            display: none;
+        }
+
+        .page:last-of-type .footer-bar {
+            display: block;
+        }
+
         @media print {
             body {
                 print-color-adjust: exact;
@@ -313,6 +327,9 @@ export const generateQuotationHTML = (data) => {
             <p><strong>Bank address:</strong> ${bankDetails.bankAddress}</p>
             <p><strong>Bank country:</strong> ${bankDetails.bankCountry}</p>
         </div>
+
+        <!-- Footer - appears only on final page -->
+        <img src="/footer.png" alt="Footer" class="footer-bar">
     </div>
 
     <script>
