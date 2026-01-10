@@ -72,7 +72,7 @@ export const generateQuotationHTML = (data) => {
 
         @page {
             size: A4;
-            margin: 15mm;
+            margin: 0;
         }
 
         body {

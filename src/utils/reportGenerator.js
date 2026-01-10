@@ -2,15 +2,36 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatCurrency, formatNumber } from './formatters';
 
-export const generatePDFReport = (results, items, settings, previewResults = null, reportName = '') => {
+// Helper to convert image URL to base64
+const loadImageAsBase64 = async (url) => {
+    try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    } catch (error) {
+        console.error('Error loading image:', error);
+        return null;
+    }
+};
+
+export const generatePDFReport = async (results, items, settings, previewResults = null, reportName = '') => {
     if (!results) return null;
 
     const { summary, costs, itemBreakdowns, rates } = results;
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 15;
     const contentWidth = pageWidth - 2 * margin;
     let yPos = margin;
+
+    // Load footer image
+    const footerImage = await loadImageAsBase64('/footer.png');
 
     // Header
     doc.setFillColor(59, 130, 246);
@@ -197,8 +218,10 @@ export const generatePDFReport = (results, items, settings, previewResults = nul
 
         if (previewItem) {
             return [
+                (index + 1).toString(),  // ID column
                 item.description || `Item ${index + 1}`,
                 formatNumber(item.quantity, 0),
+                item.unitType || 'pcs',
                 formatNumber(item.itemCbm, 2),
                 `${formatCurrency(previewItem.exwPrice * previewItem.quantity)}\n(${formatCurrency(item.exwPrice * item.quantity)})`,
                 `${formatCurrency(previewItem.allocatedFreight)}\n(${formatCurrency(item.allocatedFreight)})`,
@@ -211,8 +234,10 @@ export const generatePDFReport = (results, items, settings, previewResults = nul
         }
 
         return [
+            (index + 1).toString(),  // ID column
             item.description || `Item ${index + 1}`,
             formatNumber(item.quantity, 0),
+            item.unitType || 'pcs',
             formatNumber(item.itemCbm, 2),
             formatCurrency(item.exwPrice * item.quantity),
             formatCurrency(item.allocatedFreight),
@@ -227,14 +252,14 @@ export const generatePDFReport = (results, items, settings, previewResults = nul
     // Add total row
     if (previewResults) {
         itemsTableData.push([
-            { content: 'TOTAL', colSpan: 6, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+            { content: 'TOTAL', colSpan: 8, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
             `${formatCurrency(previewResults.costs.ddpTotal)}\n(${formatCurrency(costs.ddpTotal)})`,
             `QAR ${formatNumber(previewResults.costs.ddpTotal * rates.usdToQar, 2)}\n(QAR ${formatNumber(costs.ddpTotal * rates.usdToQar, 2)})`,
             '', ''
         ]);
     } else {
         itemsTableData.push([
-            { content: 'TOTAL', colSpan: 6, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+            { content: 'TOTAL', colSpan: 8, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
             formatCurrency(costs.ddpTotal),
             `QAR ${formatNumber(costs.ddpTotal * rates.usdToQar, 2)}`,
             '', ''
@@ -243,7 +268,7 @@ export const generatePDFReport = (results, items, settings, previewResults = nul
 
     autoTable(doc, {
         startY: yPos,
-        head: [['Item', 'Qty', 'CBM', `${settings.pricingMode === 'FOB' ? 'FOB' : 'EXW'} Total`, '+Freight', '+Clearance', 'DDP Total', 'DDP Total\n(QAR)', 'DDP/Unit', 'DDP/Unit\n(QAR)']],
+        head: [['ID', 'Item', 'Qty', 'Unit', 'CBM', `${settings.pricingMode === 'FOB' ? 'FOB' : 'EXW'} Total`, '+Freight', '+Clearance', 'DDP Total', 'DDP Total\n(QAR)', 'DDP/Unit', 'DDP/Unit\n(QAR)']],
         body: itemsTableData,
         theme: 'striped',
         headStyles: { fillColor: [59, 130, 246], fontSize: 6.5, fontStyle: 'bold' },
@@ -254,16 +279,18 @@ export const generatePDFReport = (results, items, settings, previewResults = nul
             lineWidth: 0.1
         },
         columnStyles: {
-            0: { cellWidth: 28 },
-            1: { halign: 'center', cellWidth: 9 },
-            2: { halign: 'right', cellWidth: 10 },
-            3: { halign: 'right', cellWidth: 18, textColor: previewResults ? [16, 185, 129] : [0, 0, 0] },
-            4: { halign: 'right', cellWidth: 16, textColor: previewResults ? [16, 185, 129] : [0, 0, 0] },
-            5: { halign: 'right', cellWidth: 18, textColor: previewResults ? [16, 185, 129] : [0, 0, 0] },
-            6: { halign: 'right', cellWidth: 18, fontStyle: 'bold', textColor: previewResults ? [16, 185, 129] : [0, 0, 0] },
-            7: { halign: 'right', cellWidth: 18, fontStyle: 'bold', textColor: [139, 92, 246] },
-            8: { halign: 'right', cellWidth: 18, fontStyle: 'bold', textColor: previewResults ? [16, 185, 129] : [0, 0, 0] },
-            9: { halign: 'right', cellWidth: 18, fontStyle: 'bold', textColor: [139, 92, 246] }
+            0: { halign: 'center', cellWidth: 8 },    // ID
+            1: { cellWidth: 32 },                      // Item (kept large)
+            2: { halign: 'center', cellWidth: 8 },    // Qty
+            3: { halign: 'center', cellWidth: 8 },    // Unit
+            4: { halign: 'right', cellWidth: 10 },    // CBM
+            5: { halign: 'right', cellWidth: 15 },    // EXW Total
+            6: { halign: 'right', cellWidth: 15 },    // +Freight
+            7: { halign: 'right', cellWidth: 15 },    // +Clearance
+            8: { halign: 'right', cellWidth: 16, fontStyle: 'bold' },    // DDP Total
+            9: { halign: 'right', cellWidth: 16, fontStyle: 'bold', textColor: [139, 92, 246] },    // DDP Total (QAR)
+            10: { halign: 'right', cellWidth: 16, fontStyle: 'bold' },   // DDP/Unit
+            11: { halign: 'right', cellWidth: 16, fontStyle: 'bold', textColor: [139, 92, 246] }    // DDP/Unit (QAR)
         },
         margin: { left: margin, right: margin }
     });
@@ -278,11 +305,27 @@ export const generatePDFReport = (results, items, settings, previewResults = nul
     yPos += 4;
     doc.text('Generated with Claude Code | All calculations based on official rates', margin, yPos);
 
+    // Add footer image to last page
+    const pageCount = doc.internal.getNumberOfPages();
+    doc.setPage(pageCount);
+
+    if (footerImage) {
+        try {
+            const footerMaxWidth = 80;
+            const footerMaxHeight = 25;
+            const footerX = pageWidth - margin - footerMaxWidth;
+            const footerY = pageHeight - margin - footerMaxHeight - 35;
+            doc.addImage(footerImage, 'PNG', footerX, footerY, footerMaxWidth, footerMaxHeight);
+        } catch (e) {
+            console.error('Error adding footer:', e);
+        }
+    }
+
     return doc;
 };
 
-export const downloadPDFReport = (results, items, settings, filename = 'ddp-report.pdf', previewResults = null, reportName = '') => {
-    const doc = generatePDFReport(results, items, settings, previewResults, reportName);
+export const downloadPDFReport = async (results, items, settings, filename = 'ddp-report.pdf', previewResults = null, reportName = '') => {
+    const doc = await generatePDFReport(results, items, settings, previewResults, reportName);
     if (doc) {
         doc.save(filename);
     }

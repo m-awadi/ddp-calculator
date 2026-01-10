@@ -10,10 +10,17 @@ const ResultsPanel = ({ results, items, settings, previewResults = null, customs
     const pricingMode = settings?.pricingMode || 'EXW';
     const priceLabel = pricingMode === 'FOB' ? 'FOB' : 'EXW';
 
-    const handleDownloadReport = () => {
-        const timestamp = new Date().toISOString().slice(0, 10);
-        const filename = `DDP-Report-${timestamp}.pdf`;
-        downloadPDFReport(results, items, settings, filename, previewResults, reportName);
+    const handleDownloadReport = async () => {
+        try {
+            console.log('Generating PDF report...');
+            const timestamp = new Date().toISOString().slice(0, 10);
+            const filename = `DDP-Report-${timestamp}.pdf`;
+            await downloadPDFReport(results, items, settings, filename, previewResults, reportName);
+            console.log('PDF report generated successfully!');
+        } catch (error) {
+            console.error('Error generating PDF report:', error);
+            alert('Error generating PDF report. Please check the console for details.');
+        }
     };
 
     const handleGenerateQuotation = () => {
