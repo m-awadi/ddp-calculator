@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DDP Calculator | Arabian Trade Route</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0f1a;
+            --bg-secondary: #111827;
+            --bg-card: #1a2234;
+            --bg-input: #0d1321;
+            --border: #2a3548;
+            --border-focus: #3b82f6;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-blue: #3b82f6;
+            --accent-cyan: #06b6d4;
+            --accent-emerald: #10b981;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+            --accent-purple: #8b5cf6;
+            --gradient-blue: linear-gradient(135deg, #3b82f6, #06b6d4);
+            --gradient-gold: linear-gradient(135deg, #f59e0b, #fbbf24);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .mono {
+            font-family: 'Space Mono', monospace;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        .slide-in {
+            animation: slideIn 0.3s ease-out forwards;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useCallback } = React;
+
+        // ============================================
+        // CONFIGURATION & CONSTANTS
+        // ============================================
+        
+        const CONTAINER_SPECS = {
+            '20GP': { cbm: 33, maxWeight: 28000, name: "20' Standard" },
+            '40GP': { cbm: 67, maxWeight: 28000, name: "40' Standard" },
+            '40HC': { cbm: 76, maxWeight: 28000, name: "40' High Cube" },
+        };
+
+        const DEFAULT_RATES = {
+            // Sea freight (USD per container) - China to Qatar averages
+            seaFreight: {
+                '20GP': 1800,
+                '40GP': 3200,
+                '40HC': 3400,
+            },
+            // Qatar clearance costs (QAR) - CMA CGM Tariff Structure
+            qatarClearance: {
+                customsDutyRate: 0.05, // 5% standard
+                mwaniCharges: 160,
+                deliveryOrder: {
+                    '20GP': 650,
+                    '40GP': 1000,
+                    '40HC': 1100,
+                },
+                terminalHandling: {
+                    '20GP': 650,
+                    '40GP': 1000,
+                    '40HC': 1100,
+                },
+                containerReturn: {
+                    '20GP': 150,
+                    '40GP': 300,
+                    '40HC': 380,
+                },
+                containerMaintenance: {
+                    '20GP': 20.02,
+                    '40GP': 40.04,
+                    '40HC': 40.04,
+                },
+                terminalInspection: 35,
+                inspectionCharge: 50,
+                clearanceAgentFees: 250,
+                documentAttestation: 100,
+            },
+            // Local transportation in Qatar (QAR)
+            localTransport: 800,
+            // Domestic China shipping (USD per CBM)
+            domesticChinaPerCbm: 15,
+            // Insurance rate (% of CIF)
+            insuranceRate: 0.005,
+            // Certification cost per shipment (USD)
+            certificationCost: 150,
+            // USD to QAR exchange rate
+            usdToQar: 3.65,
+            // Default profit margin
+            profitMargin: 0.15,
+            // Default commission rate
+            commissionRate: 0.06,
+        };
+
+        // ============================================
+        // UTILITY FUNCTIONS
+        // ============================================
+
+        const formatCurrency = (amount, currency = 'USD') => {
+            const formatter = new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: currency,
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+            return formatter.format(amount);
+        };
+
+        const formatNumber = (num, decimals = 2) => {
+            return new Intl.NumberFormat('en-US', {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals,
+            }).format(num);
+        };
+
+        // Calculate MOFA attestation fees based on tiered structure
+        const calculateMofaFee = (invoiceValueQar) => {
+            const certificateOfOrigin = 150; // Fixed QAR 150
+
+            let attestationFee = 0;
+            if (invoiceValueQar <= 15000) {
+                attestationFee = 500;
+            } else if (invoiceValueQar <= 100000) {
+                attestationFee = 1000;
+            } else if (invoiceValueQar <= 250000) {
+                attestationFee = 2500;
+            } else if (invoiceValueQar <= 1000000) {
+                attestationFee = 5000;
+            } else {
+                attestationFee = invoiceValueQar * 0.006; // 0.6%
+            }
+
+            return certificateOfOrigin + attestationFee;
+        };
+
+        // ============================================
+        // CALCULATION ENGINE
+        // ============================================
+
+        const calculateDDP = (items, settings, overrides) => {
+            if (!items.length) return null;
+
+            const rates = { ...DEFAULT_RATES, ...overrides };
+            
+            // Calculate totals
+            let totalCbm = 0;
+            let totalWeight = 0;
+            let totalExwCost = 0;
+
+            items.forEach(item => {
+                const itemCbm = item.cbmPerUnit * item.quantity;
+                const itemWeight = (item.weightPerUnit || 0) * item.quantity;
+                totalCbm += itemCbm;
+                totalWeight += itemWeight;
+                totalExwCost += item.exwPrice * item.quantity;
+            });
+
+            // Determine container configuration
+            let containers = [];
+            let remainingCbm = totalCbm;
+            
+            // Simple container allocation (prioritize 40HC for efficiency)
+            while (remainingCbm > 0) {
+                if (remainingCbm > CONTAINER_SPECS['40GP'].cbm) {
+                    containers.push('40HC');
+                    remainingCbm -= CONTAINER_SPECS['40HC'].cbm;
+                } else if (remainingCbm > CONTAINER_SPECS['20GP'].cbm) {
+                    containers.push('40GP');
+                    remainingCbm -= CONTAINER_SPECS['40GP'].cbm;
+                } else if (remainingCbm > 15) {
+                    containers.push('20GP');
+                    remainingCbm -= CONTAINER_SPECS['20GP'].cbm;
+                } else {
+                    // LCL - use 20GP pricing pro-rated
+                    containers.push('LCL');
+                    remainingCbm = 0;
+                }
+            }
+
+            // Override with selected container if specified
+            if (settings.containerType && settings.containerType !== 'auto') {
+                containers = [settings.containerType];
+            }
+
+            // Calculate sea freight
+            let seaFreightTotal = 0;
+            containers.forEach(type => {
+                if (type === 'LCL') {
+                    // LCL rate: approximately $80-120 per CBM
+                    seaFreightTotal += totalCbm * 100;
+                } else {
+                    seaFreightTotal += rates.seaFreight[type] || rates.seaFreight['40HC'];
+                }
+            });
+
+            // Apply sea freight override if provided
+            if (overrides.seaFreightOverride) {
+                seaFreightTotal = overrides.seaFreightOverride;
+            }
+
+            // Domestic China shipping
+            const domesticChinaRate = overrides.domesticChinaPerCbmOverride || rates.domesticChinaPerCbm;
+            const domesticChinaShipping = totalCbm * domesticChinaRate;
+
+            // Calculate freight subtotal
+            const freightSubtotal = seaFreightTotal + domesticChinaShipping;
+
+            // CIF Value (Cost + Insurance + Freight)
+            const cifValue = totalExwCost + freightSubtotal;
+            const insurance = cifValue * rates.insuranceRate;
+            const cifWithInsurance = cifValue + insurance;
+
+            // Convert to QAR for Qatar charges
+            const cifValueQar = cifWithInsurance * rates.usdToQar;
+
+            // Qatar customs and clearance (all in QAR)
+            const customsDuty = cifValueQar * rates.qatarClearance.customsDutyRate;
+            
+            // Calculate container-based fees (all in QAR)
+            let deliveryOrderFees = 0;
+            let terminalHandling = 0;
+            let containerReturn = 0;
+            let containerMaintenance = 0;
+            containers.forEach(type => {
+                if (type !== 'LCL') {
+                    deliveryOrderFees += rates.qatarClearance.deliveryOrder[type] || 1000;
+                    terminalHandling += rates.qatarClearance.terminalHandling[type] || 1000;
+                    containerReturn += rates.qatarClearance.containerReturn[type] || 300;
+                    containerMaintenance += rates.qatarClearance.containerMaintenance[type] || 40.04;
+                } else {
+                    // LCL fees (approximate)
+                    deliveryOrderFees += 200;
+                    terminalHandling += 300;
+                    containerReturn += 50;
+                    containerMaintenance += 10;
+                }
+            });
+
+            // Calculate MOFA attestation fees based on invoice value (use totalExwCost in QAR)
+            const invoiceValueQar = totalExwCost * rates.usdToQar;
+            const mofaAttestation = calculateMofaFee(invoiceValueQar);
+
+            const qatarCharges = {
+                customsDuty,
+                mwaniCharges: rates.qatarClearance.mwaniCharges,
+                deliveryOrderFees,
+                terminalHandling,
+                containerReturn,
+                containerMaintenance,
+                terminalInspection: rates.qatarClearance.terminalInspection,
+                inspectionCharge: rates.qatarClearance.inspectionCharge,
+                clearanceAgentFees: rates.qatarClearance.clearanceAgentFees,
+                documentAttestation: mofaAttestation,
+                localTransport: rates.localTransport,
+            };
+
+            const totalQatarChargesQar = Object.values(qatarCharges).reduce((a, b) => a + b, 0);
+            const totalQatarChargesUsd = totalQatarChargesQar / rates.usdToQar;
+
+            // Certification costs
+            const certificationCost = rates.certificationCost;
+
+            // Total landed cost before margin
+            const landedCostBeforeMargin = cifWithInsurance + totalQatarChargesUsd + certificationCost;
+
+            // Calculate margin and commission
+            const profitMargin = landedCostBeforeMargin * settings.profitMargin;
+            const subtotalWithMargin = landedCostBeforeMargin + profitMargin;
+            const commission = subtotalWithMargin * settings.commissionRate;
+
+            // Final DDP total
+            const ddpTotal = subtotalWithMargin + commission;
+
+            // Calculate per-item costs (pro-rated by value contribution)
+            const itemBreakdowns = items.map(item => {
+                const itemTotal = item.exwPrice * item.quantity;
+                const valueRatio = itemTotal / totalExwCost;
+                const itemCbm = item.cbmPerUnit * item.quantity;
+                const cbmRatio = itemCbm / totalCbm;
+                
+                // Allocate costs
+                const allocatedFreight = freightSubtotal * cbmRatio;
+                const allocatedQatarCharges = totalQatarChargesUsd * valueRatio;
+                const allocatedCertification = certificationCost * valueRatio;
+                const allocatedInsurance = insurance * valueRatio;
+                
+                const itemLandedCost = itemTotal + allocatedFreight + allocatedQatarCharges +
+                                       allocatedCertification + allocatedInsurance;
+
+                // Calculate profit margin (percentage or fixed USD)
+                const itemMargin = settings.profitMarginMode === 'percentage'
+                    ? itemLandedCost * settings.profitMargin
+                    : settings.profitMargin * valueRatio;
+
+                const itemWithMargin = itemLandedCost + itemMargin;
+
+                // Calculate commission (percentage or fixed USD)
+                const itemCommission = settings.commissionMode === 'percentage'
+                    ? itemWithMargin * settings.commissionRate
+                    : settings.commissionRate * valueRatio;
+
+                const itemDdpTotal = itemWithMargin + itemCommission;
+                const ddpPerUnit = itemDdpTotal / item.quantity;
+
+                return {
+                    ...item,
+                    itemCbm,
+                    valueRatio,
+                    cbmRatio,
+                    allocatedFreight,
+                    allocatedQatarCharges,
+                    allocatedCertification,
+                    allocatedInsurance,
+                    itemLandedCost,
+                    itemMargin,
+                    itemCommission,
+                    itemDdpTotal,
+                    ddpPerUnit,
+                };
+            });
+
+            return {
+                summary: {
+                    totalItems: items.length,
+                    totalQuantity: items.reduce((a, b) => a + b.quantity, 0),
+                    totalCbm,
+                    totalWeight,
+                    totalExwCost,
+                    containers,
+                    containerCount: containers.length,
+                },
+                costs: {
+                    exwTotal: totalExwCost,
+                    domesticChinaShipping,
+                    seaFreight: seaFreightTotal,
+                    insurance,
+                    cifValue: cifWithInsurance,
+                    certificationCost,
+                    qatarCharges,
+                    totalQatarChargesQar,
+                    totalQatarChargesUsd,
+                    landedCostBeforeMargin,
+                    profitMargin,
+                    commission,
+                    ddpTotal,
+                },
+                itemBreakdowns,
+                rates,
+            };
+        };
+
+        // ============================================
+        // COMPONENTS
+        // ============================================
+
+        // Input Component
+        const Input = ({ label, value, onChange, type = 'text', prefix, suffix, hint, error, ...props }) => (
+            <div style={{ marginBottom: '16px' }}>
+                {label && (
+                    <label style={{
+                        display: 'block',
+                        marginBottom: '6px',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        color: 'var(--text-secondary)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                    }}>
+                        {label}
+                    </label>
+                )}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    background: 'var(--bg-input)',
+                    border: `1px solid ${error ? 'var(--accent-rose)' : 'var(--border)'}`,
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    transition: 'border-color 0.2s',
+                }}>
+                    {prefix && (
+                        <span style={{
+                            padding: '10px 12px',
+                            color: 'var(--text-muted)',
+                            fontSize: '14px',
+                            background: 'var(--bg-secondary)',
+                            borderRight: '1px solid var(--border)',
+                        }} className="mono">
+                            {prefix}
+                        </span>
+                    )}
+                    <input
+                        type={type}
+                        value={value}
+                        onChange={e => onChange(e.target.value)}
+                        style={{
+                            flex: 1,
+                            padding: '10px 12px',
+                            background: 'transparent',
+                            border: 'none',
+                            outline: 'none',
+                            color: 'var(--text-primary)',
+                            fontSize: '14px',
+                            fontFamily: type === 'number' ? "'Space Mono', monospace" : 'inherit',
+                        }}
+                        {...props}
+                    />
+                    {suffix && (
+                        <span style={{
+                            padding: '10px 12px',
+                            color: 'var(--text-muted)',
+                            fontSize: '13px',
+                        }} className="mono">
+                            {suffix}
+                        </span>
+                    )}
+                </div>
+                {hint && (
+                    <p style={{ marginTop: '4px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        {hint}
+                    </p>
+                )}
+            </div>
+        );
+
+        // Select Component
+        const Select = ({ label, value, onChange, options, hint }) => (
+            <div style={{ marginBottom: '16px' }}>
+                {label && (
+                    <label style={{
+                        display: 'block',
+                        marginBottom: '6px',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        color: 'var(--text-secondary)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                    }}>
+                        {label}
+                    </label>
+                )}
+                <select
+                    value={value}
+                    onChange={e => onChange(e.target.value)}
+                    style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        background: 'var(--bg-input)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '8px',
+                        color: 'var(--text-primary)',
+                        fontSize: '14px',
+                        outline: 'none',
+                        cursor: 'pointer',
+                    }}
+                >
+                    {options.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                </select>
+                {hint && (
+                    <p style={{ marginTop: '4px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        {hint}
+                    </p>
+                )}
+            </div>
+        );
+
+        // Card Component
+        const Card = ({ title, children, accent, collapsible, defaultOpen = true }) => {
+            const [isOpen, setIsOpen] = useState(defaultOpen);
+            
+            return (
+                <div style={{
+                    background: 'var(--bg-card)',
+                    borderRadius: '12px',
+                    border: '1px solid var(--border)',
+                    overflow: 'hidden',
+                    marginBottom: '20px',
+                }} className="fade-in">
+                    {title && (
+                        <div 
+                            onClick={() => collapsible && setIsOpen(!isOpen)}
+                            style={{
+                                padding: '16px 20px',
+                                borderBottom: isOpen ? '1px solid var(--border)' : 'none',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                cursor: collapsible ? 'pointer' : 'default',
+                                background: accent ? `linear-gradient(90deg, ${accent}15, transparent)` : 'transparent',
+                            }}
+                        >
+                            <h3 style={{
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                color: accent || 'var(--text-primary)',
+                                textTransform: 'uppercase',
+                                letterSpacing: '1px',
+                            }}>
+                                {title}
+                            </h3>
+                            {collapsible && (
+                                <span style={{ color: 'var(--text-muted)', transform: isOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }}>
+                                    ▼
+                                </span>
+                            )}
+                        </div>
+                    )}
+                    {isOpen && (
+                        <div style={{ padding: '20px' }}>
+                            {children}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // Cost Row Component
+        const CostRow = ({ label, amount, currency = 'USD', highlight, indent, bold }) => (
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '8px 0',
+                paddingLeft: indent ? '20px' : '0',
+                borderBottom: '1px solid var(--border)',
+            }}>
+                <span style={{
+                    color: highlight ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    fontSize: bold ? '15px' : '14px',
+                    fontWeight: bold ? '600' : '400',
+                }}>
+                    {label}
+                </span>
+                <span style={{
+                    color: highlight ? 'var(--accent-emerald)' : 'var(--text-primary)',
+                    fontSize: bold ? '16px' : '14px',
+                    fontWeight: bold ? '700' : '500',
+                }} className="mono">
+                    {formatCurrency(amount, currency)}
+                </span>
+            </div>
+        );
+
+        // Item Row Component
+        const ItemRow = ({ item, index, onUpdate, onRemove }) => {
+            return (
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto',
+                    gap: '12px',
+                    alignItems: 'end',
+                    padding: '16px',
+                    background: index % 2 === 0 ? 'var(--bg-secondary)' : 'transparent',
+                    borderRadius: '8px',
+                    marginBottom: '8px',
+                }} className="slide-in" style={{ animationDelay: `${index * 50}ms` }}>
+                    <Input
+                        label={index === 0 ? "Item Description" : null}
+                        value={item.description}
+                        onChange={v => onUpdate(index, 'description', v)}
+                        placeholder="Product name..."
+                    />
+                    <Input
+                        label={index === 0 ? "Quantity" : null}
+                        type="number"
+                        value={item.quantity}
+                        onChange={v => onUpdate(index, 'quantity', parseFloat(v) || 0)}
+                        min="1"
+                    />
+                    <Input
+                        label={index === 0 ? "EXW Price" : null}
+                        type="number"
+                        value={item.exwPrice}
+                        onChange={v => onUpdate(index, 'exwPrice', parseFloat(v) || 0)}
+                        prefix="$"
+                        step="0.01"
+                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {index === 0 && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                <span style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)' }}>CBM:</span>
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                    <button
+                                        onClick={() => onUpdate(index, 'cbmInputMode', 'unit')}
+                                        style={{
+                                            padding: '4px 10px',
+                                            fontSize: '11px',
+                                            fontWeight: '500',
+                                            border: '1px solid',
+                                            borderColor: item.cbmInputMode === 'unit' ? 'var(--accent-blue)' : 'var(--border)',
+                                            background: item.cbmInputMode === 'unit' ? 'var(--accent-blue)20' : 'transparent',
+                                            color: item.cbmInputMode === 'unit' ? 'var(--accent-blue)' : 'var(--text-muted)',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        /Unit
+                                    </button>
+                                    <button
+                                        onClick={() => onUpdate(index, 'cbmInputMode', 'total')}
+                                        style={{
+                                            padding: '4px 10px',
+                                            fontSize: '11px',
+                                            fontWeight: '500',
+                                            border: '1px solid',
+                                            borderColor: item.cbmInputMode === 'total' ? 'var(--accent-blue)' : 'var(--border)',
+                                            background: item.cbmInputMode === 'total' ? 'var(--accent-blue)20' : 'transparent',
+                                            color: item.cbmInputMode === 'total' ? 'var(--accent-blue)' : 'var(--text-muted)',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Total
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                        <Input
+                            label={null}
+                            type="number"
+                            value={item.cbmInputMode === 'total' ? (item.cbmPerUnit * item.quantity).toFixed(3) : item.cbmPerUnit}
+                            onChange={v => {
+                                const val = parseFloat(v) || 0;
+                                if (item.cbmInputMode === 'total') {
+                                    onUpdate(index, 'cbmPerUnit', item.quantity > 0 ? val / item.quantity : 0);
+                                } else {
+                                    onUpdate(index, 'cbmPerUnit', val);
+                                }
+                            }}
+                            suffix="m³"
+                            step="0.001"
+                        />
+                    </div>
+                    <Input
+                        label={index === 0 ? "Weight/Unit" : null}
+                        type="number"
+                        value={item.weightPerUnit || ''}
+                        onChange={v => onUpdate(index, 'weightPerUnit', parseFloat(v) || 0)}
+                        suffix="kg"
+                        step="0.1"
+                    />
+                    <button
+                        onClick={() => onRemove(index)}
+                        style={{
+                            padding: '10px 14px',
+                            background: 'var(--accent-rose)20',
+                            border: '1px solid var(--accent-rose)40',
+                            borderRadius: '6px',
+                            color: 'var(--accent-rose)',
+                            cursor: 'pointer',
+                            fontSize: '16px',
+                            marginBottom: '16px',
+                            transition: '0.2s',
+                        }}
+                        onMouseOver={e => e.target.style.background = 'var(--accent-rose)40'}
+                        onMouseOut={e => e.target.style.background = 'var(--accent-rose)20'}
+                    >
+                        ✕
+                    </button>
+                </div>
+            );
+        };
+
+        // Results Panel Component
+        const ResultsPanel = ({ results }) => {
+            if (!results) return null;
+
+            const { summary, costs, itemBreakdowns, rates } = results;
+
+            return (
+                <div className="fade-in">
+                    {/* Summary Stats */}
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(4, 1fr)',
+                        gap: '16px',
+                        marginBottom: '24px',
+                    }}>
+                        {[
+                            { label: 'Total CBM', value: formatNumber(summary.totalCbm, 2), suffix: 'm³', color: 'var(--accent-blue)' },
+                            { label: 'Containers', value: summary.containers.join(', '), color: 'var(--accent-purple)' },
+                            { label: 'EXW Total', value: formatCurrency(costs.exwTotal), color: 'var(--accent-amber)' },
+                            { label: 'DDP Total', value: formatCurrency(costs.ddpTotal), color: 'var(--accent-emerald)' },
+                        ].map((stat, i) => (
+                            <div key={i} style={{
+                                background: `${stat.color}10`,
+                                border: `1px solid ${stat.color}30`,
+                                borderRadius: '10px',
+                                padding: '16px',
+                                textAlign: 'center',
+                            }}>
+                                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>
+                                    {stat.label}
+                                </p>
+                                <p style={{ fontSize: '18px', fontWeight: '700', color: stat.color }} className="mono">
+                                    {stat.value}{stat.suffix}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Cost Breakdown */}
+                    <Card title="Cost Breakdown" accent="var(--accent-blue)">
+                        <CostRow label="EXW Product Cost" amount={costs.exwTotal} />
+                        <CostRow label="Domestic China Shipping" amount={costs.domesticChinaShipping} indent />
+                        <CostRow label="Sea Freight" amount={costs.seaFreight} indent />
+                        <CostRow label="Insurance (0.5% CIF)" amount={costs.insurance} indent />
+                        <CostRow label="CIF Value" amount={costs.cifValue} bold />
+                        <div style={{ height: '12px' }} />
+                        <CostRow label="Certification" amount={costs.certificationCost} />
+                        <div style={{ height: '12px' }} />
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase' }}>
+                            Qatar Clearance Costs (QAR)
+                        </p>
+                        <CostRow label="Customs Duty (5%)" amount={costs.qatarCharges.customsDuty} currency="QAR" indent />
+                        <CostRow label="Mwani Charges" amount={costs.qatarCharges.mwaniCharges} currency="QAR" indent />
+                        <CostRow label="Delivery Order Fees" amount={costs.qatarCharges.deliveryOrderFees} currency="QAR" indent />
+                        <CostRow label="Terminal Handling" amount={costs.qatarCharges.terminalHandling} currency="QAR" indent />
+                        <CostRow label="Container Return" amount={costs.qatarCharges.containerReturn} currency="QAR" indent />
+                        <CostRow label="Container Maintenance" amount={costs.qatarCharges.containerMaintenance} currency="QAR" indent />
+                        <CostRow label="Terminal Inspection" amount={costs.qatarCharges.terminalInspection} currency="QAR" indent />
+                        <CostRow label="Inspection Charge" amount={costs.qatarCharges.inspectionCharge} currency="QAR" indent />
+                        <CostRow label="Clearance Agent Fees" amount={costs.qatarCharges.clearanceAgentFees} currency="QAR" indent />
+                        <CostRow label="Local Transport" amount={costs.qatarCharges.localTransport} currency="QAR" indent />
+                        <CostRow label="Document Attestation" amount={costs.qatarCharges.documentAttestation} currency="QAR" indent />
+                        <CostRow label="Total Qatar Charges" amount={costs.totalQatarChargesQar} currency="QAR" bold />
+                        <CostRow label="(in USD)" amount={costs.totalQatarChargesUsd} />
+                        <div style={{ height: '12px' }} />
+                        <CostRow label="Landed Cost (before margin)" amount={costs.landedCostBeforeMargin} bold />
+                        <CostRow label="Profit Margin" amount={costs.profitMargin} indent />
+                        <CostRow label="Commission" amount={costs.commission} indent />
+                        <div style={{ height: '8px', background: 'var(--gradient-blue)', borderRadius: '4px', margin: '16px 0' }} />
+                        <CostRow label="TOTAL DDP PRICE" amount={costs.ddpTotal} highlight bold />
+                    </Card>
+
+                    {/* Per-Item Breakdown */}
+                    <Card title="Per-Item DDP Costs" accent="var(--accent-emerald)">
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                                        <th style={{ textAlign: 'left', padding: '12px 8px', color: 'var(--text-secondary)' }}>Item</th>
+                                        <th style={{ textAlign: 'right', padding: '12px 8px', color: 'var(--text-secondary)' }}>Qty</th>
+                                        <th style={{ textAlign: 'right', padding: '12px 8px', color: 'var(--text-secondary)' }}>CBM</th>
+                                        <th style={{ textAlign: 'right', padding: '12px 8px', color: 'var(--text-secondary)' }}>EXW Total</th>
+                                        <th style={{ textAlign: 'right', padding: '12px 8px', color: 'var(--text-secondary)' }}>+Freight</th>
+                                        <th style={{ textAlign: 'right', padding: '12px 8px', color: 'var(--text-secondary)' }}>+Clearance</th>
+                                        <th style={{ textAlign: 'right', padding: '12px 8px', color: 'var(--text-secondary)' }}>DDP Total</th>
+                                        <th style={{ textAlign: 'right', padding: '12px 8px', color: 'var(--accent-emerald)' }}>DDP/Unit</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {itemBreakdowns.map((item, i) => (
+                                        <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                                            <td style={{ padding: '12px 8px', color: 'var(--text-primary)' }}>{item.description || `Item ${i + 1}`}</td>
+                                            <td style={{ padding: '12px 8px', textAlign: 'right' }} className="mono">{formatNumber(item.quantity, 0)}</td>
+                                            <td style={{ padding: '12px 8px', textAlign: 'right' }} className="mono">{formatNumber(item.itemCbm, 2)}</td>
+                                            <td style={{ padding: '12px 8px', textAlign: 'right' }} className="mono">{formatCurrency(item.exwPrice * item.quantity)}</td>
+                                            <td style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--text-muted)' }} className="mono">{formatCurrency(item.allocatedFreight)}</td>
+                                            <td style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--text-muted)' }} className="mono">{formatCurrency(item.allocatedQatarCharges)}</td>
+                                            <td style={{ padding: '12px 8px', textAlign: 'right', fontWeight: '600' }} className="mono">{formatCurrency(item.itemDdpTotal)}</td>
+                                            <td style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--accent-emerald)', fontWeight: '700' }} className="mono">{formatCurrency(item.ddpPerUnit)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
+
+                    {/* Container Utilization */}
+                    <Card title="Container Utilization" accent="var(--accent-purple)">
+                        {summary.containers.map((type, i) => {
+                            const capacity = type === 'LCL' ? summary.totalCbm : CONTAINER_SPECS[type]?.cbm || 76;
+                            const used = Math.min(summary.totalCbm, capacity);
+                            const utilization = (used / capacity) * 100;
+                            
+                            return (
+                                <div key={i} style={{ marginBottom: '16px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                        <span style={{ color: 'var(--text-secondary)' }}>
+                                            {type === 'LCL' ? 'LCL Shipment' : `Container ${i + 1}: ${type}`}
+                                        </span>
+                                        <span className="mono" style={{ color: 'var(--accent-purple)' }}>
+                                            {formatNumber(used, 1)} / {formatNumber(capacity, 0)} CBM ({formatNumber(utilization, 0)}%)
+                                        </span>
+                                    </div>
+                                    <div style={{
+                                        height: '8px',
+                                        background: 'var(--bg-input)',
+                                        borderRadius: '4px',
+                                        overflow: 'hidden',
+                                    }}>
+                                        <div style={{
+                                            width: `${Math.min(utilization, 100)}%`,
+                                            height: '100%',
+                                            background: utilization > 85 ? 'var(--accent-emerald)' : utilization > 50 ? 'var(--accent-amber)' : 'var(--accent-rose)',
+                                            borderRadius: '4px',
+                                            transition: 'width 0.5s ease-out',
+                                        }} />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </Card>
+                </div>
+            );
+        };
+
+        // ============================================
+        // MAIN APP
+        // ============================================
+
+        const App = () => {
+            // Items state
+            const [items, setItems] = useState([
+                { description: '', quantity: 1, exwPrice: 0, cbmPerUnit: 0.01, weightPerUnit: 0, cbmInputMode: 'unit' }
+            ]);
+
+            // Settings state
+            const [settings, setSettings] = useState({
+                containerType: 'auto',
+                profitMargin: 0.15,
+                profitMarginMode: 'percentage',
+                commissionRate: 0.06,
+                commissionMode: 'percentage',
+            });
+
+            // Overrides state
+            const [overrides, setOverrides] = useState({
+                seaFreightOverride: null,
+                customsDutyRate: null,
+                domesticChinaPerCbmOverride: null,
+            });
+
+            // Show overrides panel
+            const [showOverrides, setShowOverrides] = useState(false);
+
+            // Add new item
+            const addItem = () => {
+                setItems([...items, { description: '', quantity: 1, exwPrice: 0, cbmPerUnit: 0.01, weightPerUnit: 0, cbmInputMode: 'unit' }]);
+            };
+
+            // Update item
+            const updateItem = (index, field, value) => {
+                const newItems = [...items];
+                newItems[index][field] = value;
+                setItems(newItems);
+            };
+
+            // Remove item
+            const removeItem = (index) => {
+                if (items.length > 1) {
+                    setItems(items.filter((_, i) => i !== index));
+                }
+            };
+
+            // Calculate results
+            const results = useMemo(() => {
+                const validItems = items.filter(item => item.quantity > 0 && item.exwPrice > 0 && item.cbmPerUnit > 0);
+                if (validItems.length === 0) return null;
+                return calculateDDP(validItems, settings, overrides);
+            }, [items, settings, overrides]);
+
+            return (
+                <div style={{ minHeight: '100vh' }}>
+                    {/* Header */}
+                    <header style={{
+                        background: 'var(--bg-secondary)',
+                        borderBottom: '1px solid var(--border)',
+                        padding: '20px 0',
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 100,
+                    }}>
+                        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 24px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                    <h1 style={{
+                                        fontSize: '24px',
+                                        fontWeight: '700',
+                                        background: 'var(--gradient-blue)',
+                                        WebkitBackgroundClip: 'text',
+                                        WebkitTextFillColor: 'transparent',
+                                        marginBottom: '4px',
+                                    }}>
+                                        DDP Cost Calculator
+                                    </h1>
+                                    <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                                        Arabian Trade Route • China → Qatar (Hamad Port)
+                                    </p>
+                                </div>
+                                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                    <span className="mono" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                        Rate: 1 USD = {DEFAULT_RATES.usdToQar} QAR
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Main Content */}
+                    <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: '24px' }}>
+                            {/* Left Column - Input */}
+                            <div>
+                                {/* Items Input */}
+                                <Card title="Shipment Items" accent="var(--accent-blue)">
+                                    {items.map((item, index) => (
+                                        <ItemRow
+                                            key={index}
+                                            item={item}
+                                            index={index}
+                                            onUpdate={updateItem}
+                                            onRemove={removeItem}
+                                        />
+                                    ))}
+                                    <button
+                                        onClick={addItem}
+                                        style={{
+                                            width: '100%',
+                                            padding: '12px',
+                                            background: 'var(--accent-blue)20',
+                                            border: '1px dashed var(--accent-blue)',
+                                            borderRadius: '8px',
+                                            color: 'var(--accent-blue)',
+                                            cursor: 'pointer',
+                                            fontSize: '14px',
+                                            fontWeight: '500',
+                                            transition: '0.2s',
+                                            marginTop: '8px',
+                                        }}
+                                        onMouseOver={e => e.target.style.background = 'var(--accent-blue)30'}
+                                        onMouseOut={e => e.target.style.background = 'var(--accent-blue)20'}
+                                    >
+                                        + Add Item
+                                    </button>
+                                </Card>
+
+                                {/* Results */}
+                                <ResultsPanel results={results} />
+                            </div>
+
+                            {/* Right Column - Settings */}
+                            <div>
+                                <Card title="Shipment Settings" accent="var(--accent-cyan)">
+                                    <Select
+                                        label="Container Type"
+                                        value={settings.containerType}
+                                        onChange={v => setSettings({ ...settings, containerType: v })}
+                                        options={[
+                                            { value: 'auto', label: 'Auto-select (recommended)' },
+                                            { value: '20GP', label: "20' Standard (33 CBM)" },
+                                            { value: '40GP', label: "40' Standard (67 CBM)" },
+                                            { value: '40HC', label: "40' High Cube (76 CBM)" },
+                                        ]}
+                                        hint="Auto will optimize based on total volume"
+                                    />
+                                    <div style={{ marginBottom: '16px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                            <span style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)' }}>Profit Margin:</span>
+                                            <div style={{ display: 'flex', gap: '4px' }}>
+                                                <button
+                                                    onClick={() => setSettings({ ...settings, profitMarginMode: 'percentage', profitMargin: 0.15 })}
+                                                    style={{
+                                                        padding: '4px 10px',
+                                                        fontSize: '11px',
+                                                        fontWeight: '500',
+                                                        border: '1px solid',
+                                                        borderColor: settings.profitMarginMode === 'percentage' ? 'var(--accent-cyan)' : 'var(--border)',
+                                                        background: settings.profitMarginMode === 'percentage' ? 'var(--accent-cyan)20' : 'transparent',
+                                                        color: settings.profitMarginMode === 'percentage' ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                                                        borderRadius: '4px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    %
+                                                </button>
+                                                <button
+                                                    onClick={() => setSettings({ ...settings, profitMarginMode: 'fixed', profitMargin: 100 })}
+                                                    style={{
+                                                        padding: '4px 10px',
+                                                        fontSize: '11px',
+                                                        fontWeight: '500',
+                                                        border: '1px solid',
+                                                        borderColor: settings.profitMarginMode === 'fixed' ? 'var(--accent-cyan)' : 'var(--border)',
+                                                        background: settings.profitMarginMode === 'fixed' ? 'var(--accent-cyan)20' : 'transparent',
+                                                        color: settings.profitMarginMode === 'fixed' ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                                                        borderRadius: '4px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    USD
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <Input
+                                            label={null}
+                                            type="number"
+                                            value={settings.profitMarginMode === 'percentage' ? (settings.profitMargin * 100).toFixed(0) : settings.profitMargin.toFixed(2)}
+                                            onChange={v => setSettings({ ...settings, profitMargin: settings.profitMarginMode === 'percentage' ? (parseFloat(v) / 100 || 0) : (parseFloat(v) || 0) })}
+                                            suffix={settings.profitMarginMode === 'percentage' ? '%' : 'USD'}
+                                            min="0"
+                                            hint={settings.profitMarginMode === 'percentage' ? 'Applied to landed cost' : 'Fixed amount in USD'}
+                                        />
+                                    </div>
+                                    <div style={{ marginBottom: '16px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                            <span style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)' }}>Commission:</span>
+                                            <div style={{ display: 'flex', gap: '4px' }}>
+                                                <button
+                                                    onClick={() => setSettings({ ...settings, commissionMode: 'percentage', commissionRate: 0.06 })}
+                                                    style={{
+                                                        padding: '4px 10px',
+                                                        fontSize: '11px',
+                                                        fontWeight: '500',
+                                                        border: '1px solid',
+                                                        borderColor: settings.commissionMode === 'percentage' ? 'var(--accent-cyan)' : 'var(--border)',
+                                                        background: settings.commissionMode === 'percentage' ? 'var(--accent-cyan)20' : 'transparent',
+                                                        color: settings.commissionMode === 'percentage' ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                                                        borderRadius: '4px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    %
+                                                </button>
+                                                <button
+                                                    onClick={() => setSettings({ ...settings, commissionMode: 'fixed', commissionRate: 50 })}
+                                                    style={{
+                                                        padding: '4px 10px',
+                                                        fontSize: '11px',
+                                                        fontWeight: '500',
+                                                        border: '1px solid',
+                                                        borderColor: settings.commissionMode === 'fixed' ? 'var(--accent-cyan)' : 'var(--border)',
+                                                        background: settings.commissionMode === 'fixed' ? 'var(--accent-cyan)20' : 'transparent',
+                                                        color: settings.commissionMode === 'fixed' ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                                                        borderRadius: '4px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    USD
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <Input
+                                            label={null}
+                                            type="number"
+                                            value={settings.commissionMode === 'percentage' ? (settings.commissionRate * 100).toFixed(0) : settings.commissionRate.toFixed(2)}
+                                            onChange={v => setSettings({ ...settings, commissionRate: settings.commissionMode === 'percentage' ? (parseFloat(v) / 100 || 0) : (parseFloat(v) || 0) })}
+                                            suffix={settings.commissionMode === 'percentage' ? '%' : 'USD'}
+                                            min="0"
+                                            hint={settings.commissionMode === 'percentage' ? 'Sales agent commission (4-10% typical)' : 'Fixed amount in USD'}
+                                        />
+                                    </div>
+                                </Card>
+
+                                {/* Rate Overrides */}
+                                <Card title="Rate Overrides" accent="var(--accent-amber)" collapsible defaultOpen={false}>
+                                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                                        Override default rates if you have actual quotes
+                                    </p>
+                                    <Input
+                                        label="Sea Freight (Total)"
+                                        type="number"
+                                        value={overrides.seaFreightOverride || ''}
+                                        onChange={v => setOverrides({ ...overrides, seaFreightOverride: v ? parseFloat(v) : null })}
+                                        prefix="$"
+                                        hint="Leave empty to use average rates"
+                                    />
+                                    <Input
+                                        label="Domestic China Shipping"
+                                        type="number"
+                                        value={overrides.domesticChinaPerCbmOverride || ''}
+                                        onChange={v => setOverrides({ ...overrides, domesticChinaPerCbmOverride: v ? parseFloat(v) : null })}
+                                        prefix="$"
+                                        suffix="per CBM"
+                                        hint={`Default: $${DEFAULT_RATES.domesticChinaPerCbm} per CBM`}
+                                    />
+                                    <div style={{ marginTop: '16px', padding: '12px', background: 'var(--bg-secondary)', borderRadius: '8px' }}>
+                                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>Default Sea Freight Rates:</p>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '13px' }}>
+                                            <span>20GP:</span><span className="mono">${DEFAULT_RATES.seaFreight['20GP']}</span>
+                                            <span>40GP:</span><span className="mono">${DEFAULT_RATES.seaFreight['40GP']}</span>
+                                            <span>40HC:</span><span className="mono">${DEFAULT_RATES.seaFreight['40HC']}</span>
+                                        </div>
+                                    </div>
+                                </Card>
+
+                                {/* Qatar Clearance Reference */}
+                                <Card title="Qatar Clearance Reference" accent="var(--accent-purple)" collapsible defaultOpen={false}>
+                                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                                        Standard charges from CMA CGM & Falcon Customs
+                                    </p>
+                                    <div style={{ fontSize: '13px' }}>
+                                        {[
+                                            ['Customs Duty', '5% of CIF'],
+                                            ['Mwani Charges', 'QAR 160'],
+                                            ['Delivery Order (40HC)', 'QAR 1,100'],
+                                            ['THC (40HC)', 'QAR 1,100'],
+                                            ['Container Return (40HC)', 'QAR 380'],
+                                            ['Container Maint. (40HC)', 'QAR 40.04'],
+                                            ['Terminal Inspection', 'QAR 35'],
+                                            ['Inspection Charge', 'QAR 50'],
+                                            ['Clearance Agent', 'QAR 250'],
+                                            ['Local Transport', 'QAR 800'],
+                                            ['MOFA Attestation', 'Tiered by value'],
+                                        ].map(([label, value], i) => (
+                                            <div key={i} style={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                padding: '8px 0',
+                                                borderBottom: '1px solid var(--border)',
+                                            }}>
+                                                <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
+                                                <span className="mono" style={{ color: 'var(--text-primary)' }}>{value}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </Card>
+
+                                {/* Help */}
+                                <Card title="Quick Guide" collapsible defaultOpen={false}>
+                                    <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7' }}>
+                                        <p style={{ marginBottom: '12px' }}>
+                                            <strong style={{ color: 'var(--text-primary)' }}>1. Add Items:</strong> Enter each product with its EXW price and volume (CBM per unit).
+                                        </p>
+                                        <p style={{ marginBottom: '12px' }}>
+                                            <strong style={{ color: 'var(--text-primary)' }}>2. Review Settings:</strong> Adjust profit margin and commission as needed.
+                                        </p>
+                                        <p style={{ marginBottom: '12px' }}>
+                                            <strong style={{ color: 'var(--text-primary)' }}>3. Override Rates:</strong> If you have actual freight quotes, enter them to get precise costs.
+                                        </p>
+                                        <p>
+                                            <strong style={{ color: 'var(--text-primary)' }}>4. DDP/Unit:</strong> The final column shows what each unit will cost delivered to Qatar.
+                                        </p>
+                                    </div>
+                                </Card>
+                            </div>
+                        </div>
+                    </main>
+
+                    {/* Footer */}
+                    <footer style={{
+                        borderTop: '1px solid var(--border)',
+                        padding: '16px 24px',
+                        textAlign: 'center',
+                        color: 'var(--text-muted)',
+                        fontSize: '12px',
+                    }}>
+                        Arabian Trade Route DDP Calculator v1.0 • Rates effective as of CMA CGM Oct 2023 schedule
+                    </footer>
+                </div>
+            );
+        };
+
+        // Render
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>

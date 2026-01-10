@@ -7,6 +7,13 @@ A comprehensive web application for calculating accurate DDP costs with support 
 [![Tests](https://img.shields.io/badge/tests-55%20passing-brightgreen)](src/__tests__)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+
+> **📌 Important**: This project has two versions:
+> - **`index.old.html`** - Full-featured standalone app ← **Use this for production**
+> - **`npm run dev`** - Modular Vite/React demo (development/testing)
+>
+> See [INTEGRATION_STATUS.md](INTEGRATION_STATUS.md) for complete details.
+
 ---
 
 ## ✨ Features
@@ -52,17 +59,21 @@ npm install
 
 ### Running the Application
 
-#### Option 1: Vite Dev Server (Recommended)
+#### Option 1: Full-Featured Standalone Version (Production Ready)
+```bash
+# Open the standalone HTML file
+open index.old.html
+# or
+python server.py  # serves index.old.html
+```
+**Note**: This version has ALL features and works without build tools.
+
+#### Option 2: Vite/React Modular Demo (Development)
 ```bash
 npm run dev
 # Opens at http://localhost:8080 with hot reload
 ```
-
-#### Option 2: Python Server
-```bash
-python server.py
-# Opens automatically at http://localhost:8080
-```
+**Note**: This demonstrates the modular architecture with ES6 imports. See `INTEGRATION_STATUS.md` for details.
 
 #### Option 3: Production Build
 ```bash
