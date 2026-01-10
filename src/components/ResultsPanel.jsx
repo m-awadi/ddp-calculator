@@ -1,208 +1,393 @@
-import { useState } from 'react';
+import Card from './Card';
+import CostRow from './CostRow';
+import { formatCurrency, formatNumber } from '../utils/formatters';
 import { downloadPDFReport } from '../utils/reportGenerator';
 
-const ResultsPanel = ({ results, items, settings, reportName = '' }) => {
-    const [customsPreviewEnabled, setCustomsPreviewEnabled] = useState(false);
-    const [previewResults, setPreviewResults] = useState(null);
+const ResultsPanel = ({ results, items, settings, previewResults = null, customsPreviewEnabled = false }) => {
+    if (!results) return null;
 
-    const handleDownloadReport = async () => {
-        try {
-            console.log('Generating PDF report...');
-            const timestamp = new Date().toISOString().slice(0, 10);
-            const filename = `DDP-Report-${timestamp}.pdf`;
-            await downloadPDFReport(
-                results,
-                items,
-                settings,
-                filename,
-                customsPreviewEnabled ? previewResults : null,
-                reportName
-            );
-            console.log('PDF report generated successfully!');
-        } catch (error) {
-            console.error('Error generating PDF report:', error);
-            alert('Error generating PDF report. Please check the console for details.');
-        }
-    };
+    const { summary, costs, itemBreakdowns, rates } = results;
+    const pricingMode = settings?.pricingMode || 'EXW';
+    const priceLabel = pricingMode === 'FOB' ? 'FOB' : 'EXW';
 
-    const formatCurrency = (amount, currency = 'USD') => {
-        if (amount === undefined || amount === null || isNaN(amount)) {
-            return currency === 'QAR' ? 'QAR 0.00' : '$0.00';
-        }
-        if (currency === 'QAR') {
-            return `QAR ${amount.toFixed(2)}`;
-        }
-        return `$${amount.toFixed(2)}`;
+    const handleDownloadReport = () => {
+        const timestamp = new Date().toISOString().slice(0, 10);
+        const filename = `DDP-Report-${timestamp}.pdf`;
+        downloadPDFReport(results, items, settings, filename, previewResults);
     };
 
     return (
-        <div style={{
-            marginTop: '24px',
-            padding: '24px',
-            background: '#1a2234',
-            borderRadius: '12px',
-            border: '1px solid #2a3548'
-        }}>
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '20px'
-            }}>
-                <h2 style={{
-                    fontSize: '20px',
-                    fontWeight: '600',
-                    color: '#f1f5f9',
-                    margin: 0
-                }}>
-                    DDP Cost Results
-                </h2>
-                <button
-                    onClick={handleDownloadReport}
-                    style={{
-                        padding: '10px 20px',
-                        background: 'linear-gradient(135deg, #3b82f6, #06b6d4)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                    }}
-                >
-                    📄 Download PDF Report
-                </button>
-            </div>
+        <>
+            {/* Shipment Summary */}
+            <Card title="📊 Shipment Summary" accent="var(--accent-purple)">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                    <div>
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Total Items</p>
+                        <p style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)' }}>{summary.totalItems}</p>
+                    </div>
+                    <div>
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Total Quantity</p>
+                        <p style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)' }}>{formatNumber(summary.totalQuantity, 0)}</p>
+                    </div>
+                    <div>
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Total CBM</p>
+                        <p style={{ fontSize: '20px', fontWeight: '700', color: 'var(--accent-blue)' }}>{formatNumber(summary.totalCbm, 2)} m³</p>
+                    </div>
+                    <div>
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Container(s)</p>
+                        <p style={{ fontSize: '20px', fontWeight: '700', color: 'var(--accent-cyan)' }}>{summary.containers.join(', ')}</p>
+                    </div>
+                    <div>
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Utilization</p>
+                        <p style={{ fontSize: '20px', fontWeight: '700', color: summary.containerUtilization > 80 ? 'var(--accent-emerald)' : 'var(--accent-amber)' }}>
+                            {formatNumber(summary.containerUtilization, 1)}%
+                        </p>
+                    </div>
+                </div>
+            </Card>
 
-            {/* Summary Cards */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '16px',
-                marginBottom: '24px'
-            }}>
-                <SummaryCard
-                    label="Total CIF"
-                    value={formatCurrency(results.totalCIF)}
-                    subValue={formatCurrency(results.totalCIFQAR, 'QAR')}
-                    color="#3b82f6"
-                />
-                <SummaryCard
-                    label="Customs Duties"
-                    value={formatCurrency(results.customsDuties)}
-                    subValue={formatCurrency(results.customsDutiesQAR, 'QAR')}
-                    color="#f59e0b"
-                />
-                <SummaryCard
-                    label="Local Delivery"
-                    value={formatCurrency(results.localDelivery)}
-                    subValue={formatCurrency(results.localDeliveryQAR, 'QAR')}
-                    color="#8b5cf6"
-                />
-                <SummaryCard
-                    label="Total DDP"
-                    value={formatCurrency(results.ddpTotal)}
-                    subValue={formatCurrency(results.ddpTotalQAR, 'QAR')}
-                    color="#10b981"
-                />
-            </div>
+            {/* Customs Preview Comparison */}
+            {customsPreviewEnabled && previewResults && (
+                <Card title="📋 Customs Preview Comparison" accent="var(--accent-rose)">
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                        <div style={{ textAlign: 'center' }}>
+                            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>Actual DDP</p>
+                            <p style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-primary)' }}>{formatCurrency(costs.ddpTotal)}</p>
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>Preview DDP</p>
+                            <p style={{ fontSize: '24px', fontWeight: '700', color: 'var(--accent-emerald)' }}>{formatCurrency(previewResults.costs.ddpTotal)}</p>
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>Difference</p>
+                            <p style={{ fontSize: '24px', fontWeight: '700', color: 'var(--accent-emerald)' }}>-{formatCurrency(costs.ddpTotal - previewResults.costs.ddpTotal)}</p>
+                        </div>
+                    </div>
+                </Card>
+            )}
 
-            {/* Item Breakdown Table */}
-            <div style={{ overflowX: 'auto' }}>
-                <h3 style={{
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    color: '#f1f5f9',
-                    marginBottom: '12px'
-                }}>
-                    Item Breakdown
-                </h3>
-                <table style={{
-                    width: '100%',
-                    borderCollapse: 'collapse',
-                    fontSize: '13px'
-                }}>
-                    <thead>
-                        <tr style={{ background: '#0d1321' }}>
-                            <th style={{ padding: '12px 8px', textAlign: 'center', color: '#94a3b8' }}>ID</th>
-                            <th style={{ padding: '12px 8px', textAlign: 'left', color: '#94a3b8' }}>Description</th>
-                            <th style={{ padding: '12px 8px', textAlign: 'right', color: '#94a3b8' }}>Qty</th>
-                            <th style={{ padding: '12px 8px', textAlign: 'right', color: '#94a3b8' }}>Unit Price</th>
-                            <th style={{ padding: '12px 8px', textAlign: 'right', color: '#94a3b8' }}>CIF Total</th>
-                            <th style={{ padding: '12px 8px', textAlign: 'right', color: '#94a3b8' }}>Customs</th>
-                            <th style={{ padding: '12px 8px', textAlign: 'right', color: '#94a3b8' }}>DDP Total</th>
-                            <th style={{ padding: '12px 8px', textAlign: 'right', color: '#10b981' }}>DDP/Unit</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {results.itemBreakdowns.map((item, index) => (
-                            <tr key={index} style={{
-                                borderBottom: '1px solid #2a3548',
-                                background: index % 2 === 0 ? '#111827' : 'transparent'
-                            }}>
-                                <td style={{ padding: '12px 8px', textAlign: 'center', color: '#f1f5f9' }}>
-                                    {index + 1}
-                                </td>
-                                <td style={{ padding: '12px 8px', color: '#f1f5f9' }}>
-                                    {item.description || `Item ${index + 1}`}
-                                </td>
-                                <td style={{ padding: '12px 8px', textAlign: 'right', color: '#f1f5f9' }}>
-                                    {item.quantity}
-                                </td>
-                                <td style={{ padding: '12px 8px', textAlign: 'right', color: '#f1f5f9' }}>
-                                    {formatCurrency(item.unitPrice)}
-                                </td>
-                                <td style={{ padding: '12px 8px', textAlign: 'right', color: '#f1f5f9' }}>
-                                    {formatCurrency(item.cifTotal)}
-                                </td>
-                                <td style={{ padding: '12px 8px', textAlign: 'right', color: '#f59e0b' }}>
-                                    {formatCurrency(item.customsDuty)}
-                                </td>
-                                <td style={{ padding: '12px 8px', textAlign: 'right', color: '#f1f5f9' }}>
-                                    {formatCurrency(item.ddpTotal)}
-                                </td>
-                                <td style={{ padding: '12px 8px', textAlign: 'right', color: '#10b981', fontWeight: '600' }}>
-                                    {formatCurrency(item.ddpPerUnit)}
-                                </td>
+            {/* Cost Breakdown */}
+            <Card title="💰 Cost Breakdown" accent="var(--accent-blue)">
+                {customsPreviewEnabled && previewResults && (
+                    <div style={{ marginBottom: '12px', padding: '10px', background: 'var(--accent-rose)10', border: '1px solid var(--accent-rose)30', borderRadius: '8px' }}>
+                        <p style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '4px' }}>
+                            ⚠️ Showing Preview Values (Reduced Declaration)
+                        </p>
+                        <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                            Actual values shown in parentheses
+                        </p>
+                    </div>
+                )}
+
+                <CostRow
+                    label={`${priceLabel} Product Cost`}
+                    amount={costs.totalExwCost}
+                    previewAmount={previewResults?.costs.totalExwCost}
+                    showPreview={customsPreviewEnabled && previewResults}
+                />
+
+                {pricingMode === 'EXW' && (
+                    <CostRow
+                        label="Domestic China Shipping"
+                        amount={costs.domesticChinaShipping}
+                        previewAmount={previewResults?.costs.domesticChinaShipping}
+                        showPreview={customsPreviewEnabled && previewResults}
+                        indent
+                    />
+                )}
+
+                <CostRow
+                    label="Sea Freight"
+                    amount={costs.seaFreight}
+                    previewAmount={previewResults?.costs.seaFreight}
+                    showPreview={customsPreviewEnabled && previewResults}
+                    indent
+                />
+
+                <CostRow
+                    label="Insurance"
+                    amount={costs.insurance}
+                    previewAmount={previewResults?.costs.insurance}
+                    showPreview={customsPreviewEnabled && previewResults}
+                    indent
+                />
+
+                <CostRow
+                    label="CIF Value"
+                    amount={costs.cifWithInsurance}
+                    previewAmount={previewResults?.costs.cifWithInsurance}
+                    showPreview={customsPreviewEnabled && previewResults}
+                />
+
+                <CostRow
+                    label="Customs Duty (5%)"
+                    amount={costs.qatarCharges.customsDuty}
+                    previewAmount={previewResults?.costs.qatarCharges.customsDuty}
+                    showPreview={customsPreviewEnabled && previewResults}
+                    indent
+                />
+
+                <CostRow
+                    label="Qatar Clearance Fees"
+                    amount={costs.totalQatarChargesUsd - costs.qatarCharges.customsDuty}
+                    previewAmount={previewResults ? previewResults.costs.totalQatarChargesUsd - previewResults.costs.qatarCharges.customsDuty : null}
+                    showPreview={customsPreviewEnabled && previewResults}
+                    indent
+                />
+
+                <CostRow
+                    label="Certification Cost"
+                    amount={costs.certificationCost}
+                    previewAmount={previewResults?.costs.certificationCost}
+                    showPreview={customsPreviewEnabled && previewResults}
+                />
+
+                <CostRow
+                    label="Landed Cost"
+                    amount={costs.landedCostBeforeMargin}
+                    previewAmount={previewResults?.costs.landedCostBeforeMargin}
+                    showPreview={customsPreviewEnabled && previewResults}
+                    bold
+                />
+
+                <CostRow
+                    label="Profit Margin"
+                    amount={costs.profitMargin}
+                    previewAmount={previewResults?.costs.profitMargin}
+                    showPreview={customsPreviewEnabled && previewResults}
+                />
+
+                <CostRow
+                    label="Commission"
+                    amount={costs.commission}
+                    previewAmount={previewResults?.costs.commission}
+                    showPreview={customsPreviewEnabled && previewResults}
+                />
+
+                <CostRow
+                    label="Total DDP Cost"
+                    amount={costs.ddpTotal}
+                    previewAmount={previewResults?.costs.ddpTotal}
+                    showPreview={customsPreviewEnabled && previewResults}
+                    highlight
+                    bold
+                />
+
+                <div style={{ marginTop: '16px', textAlign: 'center' }}>
+                    <button
+                        onClick={handleDownloadReport}
+                        style={{
+                            padding: '12px 24px',
+                            background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-cyan))',
+                            border: 'none',
+                            borderRadius: '8px',
+                            color: 'white',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: '0.2s',
+                        }}
+                        onMouseEnter={e => e.target.style.transform = 'translateY(-2px)'}
+                        onMouseLeave={e => e.target.style.transform = 'translateY(0)'}
+                    >
+                        📄 Download PDF Report
+                    </button>
+                </div>
+            </Card>
+
+            {/* Per-Item DDP Costs */}
+            <Card title="📦 Per-Item DDP Costs" accent="var(--accent-emerald)">
+                {customsPreviewEnabled && previewResults && (
+                    <div style={{ marginBottom: '12px', padding: '10px', background: 'var(--accent-rose)10', border: '1px solid var(--accent-rose)30', borderRadius: '8px' }}>
+                        <p style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', marginBottom: '4px' }}>
+                            ⚠️ Showing Preview Values (Reduced Declaration)
+                        </p>
+                        <p style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                            Actual values shown in parentheses
+                        </p>
+                    </div>
+                )}
+
+                <div style={{ overflowX: 'auto' }}>
+                    <table style={{
+                        width: '100%',
+                        borderCollapse: 'collapse',
+                        fontSize: '13px',
+                    }}>
+                        <thead>
+                            <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                                <th style={{ padding: '12px 8px', textAlign: 'left', color: 'var(--text-secondary)', fontWeight: '600' }}>Item</th>
+                                <th style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--text-secondary)', fontWeight: '600' }}>Qty</th>
+                                <th style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--text-secondary)', fontWeight: '600' }}>CBM</th>
+                                <th style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--text-secondary)', fontWeight: '600' }}>{priceLabel} Total</th>
+                                <th style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--text-secondary)', fontWeight: '600' }}>+Freight</th>
+                                <th style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--text-secondary)', fontWeight: '600' }}>+Clearance</th>
+                                <th style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--text-secondary)', fontWeight: '600' }}>DDP Total</th>
+                                <th style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--text-secondary)', fontWeight: '600' }}>DDP Total<br />(QAR)</th>
+                                <th style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--text-secondary)', fontWeight: '600' }}>DDP/Unit</th>
+                                <th style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--text-secondary)', fontWeight: '600' }}>DDP/Unit<br />(QAR)</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    );
-};
+                        </thead>
+                        <tbody>
+                            {itemBreakdowns.map((item, i) => {
+                                const previewItem = customsPreviewEnabled && previewResults ? previewResults.itemBreakdowns[i] : null;
+                                const showPreview = customsPreviewEnabled && previewItem;
 
-const SummaryCard = ({ label, value, subValue, color }) => {
-    return (
-        <div style={{
-            padding: '16px',
-            background: '#111827',
-            borderRadius: '8px',
-            border: '1px solid #2a3548'
-        }}>
-            <div style={{
-                fontSize: '12px',
-                color: '#94a3b8',
-                marginBottom: '8px'
-            }}>
-                {label}
-            </div>
-            <div style={{
-                fontSize: '20px',
-                fontWeight: '700',
-                color: color,
-                marginBottom: '4px'
-            }}>
-                {value}
-            </div>
-            <div style={{
-                fontSize: '11px',
-                color: '#64748b'
-            }}>
-                {subValue}
-            </div>
-        </div>
+                                return (
+                                    <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                                        <td style={{ padding: '12px 8px', color: 'var(--text-primary)' }}>
+                                            {item.description || `Item ${i + 1}`}
+                                        </td>
+                                        <td style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--text-primary)' }} className="mono">
+                                            {formatNumber(item.quantity, 0)}
+                                        </td>
+                                        <td style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--text-primary)' }} className="mono">
+                                            {formatNumber(item.itemCbm, 2)}
+                                        </td>
+                                        <td style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--text-primary)' }} className="mono">
+                                            {showPreview && (
+                                                <>
+                                                    <span style={{ color: 'var(--accent-emerald)', fontWeight: '600' }}>
+                                                        {formatCurrency(previewItem.exwPrice * previewItem.quantity)}
+                                                    </span>
+                                                    <br />
+                                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                                                        ({formatCurrency(item.exwPrice * item.quantity)})
+                                                    </span>
+                                                </>
+                                            )}
+                                            {!showPreview && formatCurrency(item.exwPrice * item.quantity)}
+                                        </td>
+                                        <td style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--text-primary)' }} className="mono">
+                                            {showPreview && (
+                                                <>
+                                                    <span style={{ color: 'var(--accent-emerald)', fontWeight: '600' }}>
+                                                        {formatCurrency(previewItem.allocatedFreight)}
+                                                    </span>
+                                                    <br />
+                                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                                                        ({formatCurrency(item.allocatedFreight)})
+                                                    </span>
+                                                </>
+                                            )}
+                                            {!showPreview && formatCurrency(item.allocatedFreight)}
+                                        </td>
+                                        <td style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--text-primary)' }} className="mono">
+                                            {showPreview && (
+                                                <>
+                                                    <span style={{ color: 'var(--accent-emerald)', fontWeight: '600' }}>
+                                                        {formatCurrency(previewItem.allocatedQatarCharges)}
+                                                    </span>
+                                                    <br />
+                                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                                                        ({formatCurrency(item.allocatedQatarCharges)})
+                                                    </span>
+                                                </>
+                                            )}
+                                            {!showPreview && formatCurrency(item.allocatedQatarCharges)}
+                                        </td>
+                                        <td style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--accent-emerald)', fontWeight: '700' }} className="mono">
+                                            {showPreview && (
+                                                <>
+                                                    <span style={{ color: 'var(--accent-emerald)' }}>
+                                                        {formatCurrency(previewItem.itemDdpTotal)}
+                                                    </span>
+                                                    <br />
+                                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 'normal' }}>
+                                                        ({formatCurrency(item.itemDdpTotal)})
+                                                    </span>
+                                                </>
+                                            )}
+                                            {!showPreview && formatCurrency(item.itemDdpTotal)}
+                                        </td>
+                                        <td style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--accent-purple)', fontWeight: '700' }} className="mono">
+                                            {showPreview && (
+                                                <>
+                                                    <span style={{ color: 'var(--accent-purple)' }}>
+                                                        {formatCurrency(previewItem.itemDdpTotal * rates.usdToQar, 'QAR')}
+                                                    </span>
+                                                    <br />
+                                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 'normal' }}>
+                                                        ({formatCurrency(item.itemDdpTotal * rates.usdToQar, 'QAR')})
+                                                    </span>
+                                                </>
+                                            )}
+                                            {!showPreview && formatCurrency(item.itemDdpTotal * rates.usdToQar, 'QAR')}
+                                        </td>
+                                        <td style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--accent-emerald)', fontWeight: '700' }} className="mono">
+                                            {showPreview && (
+                                                <>
+                                                    <span style={{ color: 'var(--accent-emerald)' }}>
+                                                        {formatCurrency(previewItem.ddpPerUnit)}
+                                                    </span>
+                                                    <br />
+                                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 'normal' }}>
+                                                        ({formatCurrency(item.ddpPerUnit)})
+                                                    </span>
+                                                </>
+                                            )}
+                                            {!showPreview && formatCurrency(item.ddpPerUnit)}
+                                        </td>
+                                        <td style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--accent-purple)', fontWeight: '700' }} className="mono">
+                                            {showPreview && (
+                                                <>
+                                                    <span style={{ color: 'var(--accent-purple)' }}>
+                                                        {formatCurrency(previewItem.ddpPerUnit * rates.usdToQar, 'QAR')}
+                                                    </span>
+                                                    <br />
+                                                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 'normal' }}>
+                                                        ({formatCurrency(item.ddpPerUnit * rates.usdToQar, 'QAR')})
+                                                    </span>
+                                                </>
+                                            )}
+                                            {!showPreview && formatCurrency(item.ddpPerUnit * rates.usdToQar, 'QAR')}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+
+                            {/* Total Row */}
+                            <tr style={{ borderTop: '2px solid var(--border)', background: 'var(--bg-secondary)' }}>
+                                <td colSpan="6" style={{ padding: '12px 8px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                                    TOTAL
+                                </td>
+                                <td style={{ padding: '12px 8px', textAlign: 'right', fontWeight: '700', color: 'var(--accent-emerald)' }} className="mono">
+                                    {customsPreviewEnabled && previewResults ? (
+                                        <>
+                                            <span style={{ color: 'var(--accent-emerald)' }}>
+                                                {formatCurrency(previewResults.costs.ddpTotal)}
+                                            </span>
+                                            <br />
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 'normal' }}>
+                                                ({formatCurrency(costs.ddpTotal)})
+                                            </span>
+                                        </>
+                                    ) : (
+                                        formatCurrency(costs.ddpTotal)
+                                    )}
+                                </td>
+                                <td style={{ padding: '12px 8px', textAlign: 'right', fontWeight: '700', color: 'var(--accent-purple)' }} className="mono">
+                                    {customsPreviewEnabled && previewResults ? (
+                                        <>
+                                            <span style={{ color: 'var(--accent-purple)' }}>
+                                                {formatCurrency(previewResults.costs.ddpTotal * rates.usdToQar, 'QAR')}
+                                            </span>
+                                            <br />
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 'normal' }}>
+                                                ({formatCurrency(costs.ddpTotal * rates.usdToQar, 'QAR')})
+                                            </span>
+                                        </>
+                                    ) : (
+                                        formatCurrency(costs.ddpTotal * rates.usdToQar, 'QAR')
+                                    )}
+                                </td>
+                                <td colSpan="2"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </Card>
+        </>
     );
 };
 

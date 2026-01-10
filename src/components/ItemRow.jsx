@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import Input from './Input';
 
-const ItemRow = ({ item, index, onUpdate, onRemove }) => {
+const ItemRow = ({ item, index, onUpdate, onRemove, pricingMode = 'EXW' }) => {
     const [showCertifications, setShowCertifications] = useState(false);
+
+    // Dynamic price label based on pricing mode
+    const priceLabel = pricingMode === 'FOB' ? 'FOB Price' : 'EXW Price';
 
     // CBM input mode handling
     const cbmInputMode = item.cbmInputMode || 'perUnit';
@@ -107,7 +110,7 @@ const ItemRow = ({ item, index, onUpdate, onRemove }) => {
                 />
             </div>
 
-            {/* EXW Price */}
+            {/* EXW/FOB Price */}
             <div>
                 {index === 0 && (
                     <label style={{
@@ -119,7 +122,7 @@ const ItemRow = ({ item, index, onUpdate, onRemove }) => {
                         textTransform: 'uppercase',
                         letterSpacing: '0.5px'
                     }}>
-                        EXW Price
+                        {priceLabel}
                     </label>
                 )}
                 <Input

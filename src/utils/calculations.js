@@ -171,9 +171,16 @@ export const calculateDDP = (items, settings, overrides = {}) => {
         seaFreightTotal = overrides.seaFreightOverride;
     }
 
-    // Domestic China shipping
-    const domesticChinaRate = overrides.domesticChinaPerCbmOverride || rates.domesticChinaPerCbm;
-    const domesticChinaShipping = totalCbm * domesticChinaRate;
+    // Domestic China shipping (only for EXW, FOB includes it in the price)
+    let domesticChinaShipping = 0;
+    if (settings.pricingMode === 'EXW' || !settings.pricingMode) {
+        if (overrides.domesticChinaShippingOverride !== null && overrides.domesticChinaShippingOverride !== undefined) {
+            domesticChinaShipping = overrides.domesticChinaShippingOverride;
+        } else {
+            const domesticChinaRate = overrides.domesticChinaPerCbmOverride || rates.domesticChinaPerCbm;
+            domesticChinaShipping = totalCbm * domesticChinaRate;
+        }
+    }
 
     // Calculate freight subtotal
     const freightSubtotal = seaFreightTotal + domesticChinaShipping;

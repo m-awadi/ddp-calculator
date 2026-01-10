@@ -1,13 +1,17 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { calculateDDP } from './utils/calculations.js';
 import { formatCurrency, formatNumber } from './utils/formatters.js';
 import { DEFAULT_RATES } from './utils/constants.js';
+import { downloadFormData, importFormDataFromFile, downloadTemplate } from './utils/importExport';
 import Card from './components/Card';
 import Input from './components/Input';
 import ItemRow from './components/ItemRow';
 import ResultsPanel from './components/ResultsPanel';
 
 function App() {
+    // Refs
+    const fileInputRef = useRef(null);
+
     // State
     const [items, setItems] = useState([
         { description: '', quantity: 1, exwPrice: 0, cbmPerUnit: 0.01, weightPerUnit: 0, cbmInputMode: 'perUnit', certifications: [] }
@@ -19,11 +23,18 @@ function App() {
         profitMarginMode: 'percentage',
         commissionRate: 0,
         commissionMode: 'percentage',
+        pricingMode: 'EXW', // EXW or FOB
     });
 
     const [overrides, setOverrides] = useState({
         seaFreightOverride: null,
         domesticChinaPerCbmOverride: null,
+    });
+
+    const [customsPreview, setCustomsPreview] = useState({
+        enabled: false,
+        invoiceCostOverride: null,
+        shippingCostOverride: null,
     });
 
     // Item management
@@ -50,6 +61,73 @@ function App() {
         return calculateDDP(validItems, settings, overrides);
     }, [items, settings, overrides]);
 
+    // Calculate preview results with reduced declaration
+    const previewResults = useMemo(() => {
+        if (!customsPreview.enabled) return null;
+
+        const validItems = items.filter(item => item.quantity > 0 && item.exwPrice > 0 && item.cbmPerUnit > 0);
+        if (validItems.length === 0) return null;
+
+        const actualInvoiceTotal = validItems.reduce((sum, item) => sum + (item.exwPrice * item.quantity), 0);
+        const actualResults = calculateDDP(validItems, settings, overrides);
+        const actualFreightTotal = actualResults.costs.domesticChinaShipping + actualResults.costs.seaFreight;
+
+        const invoiceRatio = customsPreview.invoiceCostOverride ? customsPreview.invoiceCostOverride / actualInvoiceTotal : 1;
+        const freightRatio = customsPreview.shippingCostOverride ? customsPreview.shippingCostOverride / actualFreightTotal : 1;
+
+        // Adjust item prices proportionally
+        const adjustedItems = validItems.map(item => ({
+            ...item,
+            exwPrice: item.exwPrice * invoiceRatio,
+        }));
+
+        // Override shipping costs for preview
+        const previewOverrides = {
+            ...overrides,
+            seaFreightOverride: customsPreview.shippingCostOverride || overrides.seaFreightOverride,
+            domesticChinaShippingOverride: 0,
+        };
+
+        return calculateDDP(adjustedItems, settings, previewOverrides);
+    }, [items, settings, overrides, customsPreview]);
+
+    // Import/Export handlers
+    const handleExport = () => {
+        try {
+            downloadFormData(items, settings, overrides, customsPreview);
+            console.log('Form data exported successfully');
+        } catch (error) {
+            console.error('Error exporting form data:', error);
+            alert('Error exporting form data. Please check the console for details.');
+        }
+    };
+
+    const handleImport = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        try {
+            const data = await importFormDataFromFile(file);
+            setItems(data.items);
+            setSettings(data.settings);
+            setOverrides(data.overrides);
+            setCustomsPreview(data.customsPreview);
+            console.log('Form data imported successfully');
+        } catch (error) {
+            console.error('Error importing form data:', error);
+            alert(`Error importing form data: ${error.message}`);
+        }
+
+        // Reset file input
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    const triggerImport = () => {
+        fileInputRef.current?.click();
+    };
+
     return (
         <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
             <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem' }}>
@@ -61,14 +139,93 @@ function App() {
                     marginBottom: '2rem',
                     textAlign: 'center',
                     boxShadow: '0 20px 60px rgba(59, 130, 246, 0.3)',
+                    position: 'relative',
                 }}>
+                    {/* Import/Export Buttons */}
+                    <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', display: 'flex', gap: '8px' }}>
+                        <button
+                            onClick={() => downloadTemplate()}
+                            style={{
+                                padding: '8px 16px',
+                                background: 'rgba(251, 191, 36, 0.2)',
+                                border: '1px solid rgba(255, 255, 255, 0.3)',
+                                borderRadius: '8px',
+                                color: 'white',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                transition: '0.2s',
+                            }}
+                            onMouseEnter={e => e.target.style.background = 'rgba(251, 191, 36, 0.3)'}
+                            onMouseLeave={e => e.target.style.background = 'rgba(251, 191, 36, 0.2)'}
+                            title="Download template with sample data and documentation"
+                        >
+                            <span>📋</span>
+                            <span>Template</span>
+                        </button>
+                        <button
+                            onClick={handleExport}
+                            style={{
+                                padding: '8px 16px',
+                                background: 'rgba(255, 255, 255, 0.2)',
+                                border: '1px solid rgba(255, 255, 255, 0.3)',
+                                borderRadius: '8px',
+                                color: 'white',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                transition: '0.2s',
+                            }}
+                            onMouseEnter={e => e.target.style.background = 'rgba(255, 255, 255, 0.3)'}
+                            onMouseLeave={e => e.target.style.background = 'rgba(255, 255, 255, 0.2)'}
+                        >
+                            <span>↓</span>
+                            <span>Export</span>
+                        </button>
+                        <button
+                            onClick={triggerImport}
+                            style={{
+                                padding: '8px 16px',
+                                background: 'rgba(255, 255, 255, 0.2)',
+                                border: '1px solid rgba(255, 255, 255, 0.3)',
+                                borderRadius: '8px',
+                                color: 'white',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                transition: '0.2s',
+                            }}
+                            onMouseEnter={e => e.target.style.background = 'rgba(255, 255, 255, 0.3)'}
+                            onMouseLeave={e => e.target.style.background = 'rgba(255, 255, 255, 0.2)'}
+                        >
+                            <span>↑</span>
+                            <span>Import</span>
+                        </button>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".json"
+                            onChange={handleImport}
+                            style={{ display: 'none' }}
+                        />
+                    </div>
+
                     <h1 style={{ fontSize: '3rem', marginBottom: '0.5rem', fontWeight: '700' }}>
                         🚢 DDP Calculator
                     </h1>
-                    <p style={{ fontSize: '1.1rem', opacity: 0.95 }}>
+                    <p style={{ fontSize: '1.1rem', opacity: 0.95' }}>
                         Professional China-Qatar Shipping Cost Calculator
                     </p>
-                    <div style={{ marginTop: '1rem', fontSize: '0.9rem', opacity: 0.85 }}>
+                    <div style={{ marginTop: '1rem', fontSize: '0.9rem', opacity: 0.85' }}>
                         1 USD = {DEFAULT_RATES.usdToQar} QAR
                     </div>
                 </div>
@@ -84,6 +241,7 @@ function App() {
                                     index={index}
                                     onUpdate={updateItem}
                                     onRemove={removeItem}
+                                    pricingMode={settings.pricingMode}
                                 />
                             ))}
                         </div>
@@ -261,7 +419,80 @@ function App() {
                                     step={settings.commissionMode === 'percentage' ? '0.1' : '1'}
                                 />
                             </div>
+
+                            {/* Pricing Mode */}
+                            <div>
+                                <label style={{
+                                    display: 'block',
+                                    fontSize: '12px',
+                                    fontWeight: '600',
+                                    color: 'var(--text-secondary)',
+                                    marginBottom: '8px',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px'
+                                }}>
+                                    Pricing Mode
+                                </label>
+                                <select
+                                    value={settings.pricingMode}
+                                    onChange={e => setSettings({ ...settings, pricingMode: e.target.value })}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        background: 'var(--bg-input)',
+                                        border: '1px solid var(--border)',
+                                        borderRadius: '6px',
+                                        color: 'var(--text-primary)',
+                                        fontSize: '14px',
+                                        cursor: 'pointer',
+                                        outline: 'none',
+                                    }}
+                                >
+                                    <option value="EXW">EXW (Ex Works)</option>
+                                    <option value="FOB">FOB (Free On Board)</option>
+                                </select>
+                                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                                    {settings.pricingMode === 'EXW'
+                                        ? 'Buyer pays domestic China shipping'
+                                        : 'Domestic shipping included in price'}
+                                </p>
+                            </div>
                         </div>
+                    </Card>
+
+                    {/* Customs Preview */}
+                    <Card title="📋 Customs Preview (Reduced Declaration)" accent="var(--accent-rose)">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                            <input
+                                type="checkbox"
+                                checked={customsPreview.enabled}
+                                onChange={e => setCustomsPreview({ ...customsPreview, enabled: e.target.checked })}
+                                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                            />
+                            <label style={{ fontSize: '14px', color: 'var(--text-primary)', cursor: 'pointer' }}>
+                                Enable Customs Preview Mode
+                            </label>
+                        </div>
+                        {customsPreview.enabled && (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
+                                <Input
+                                    label="Declared Invoice Total"
+                                    type="number"
+                                    value={customsPreview.invoiceCostOverride || ''}
+                                    onChange={v => setCustomsPreview({ ...customsPreview, invoiceCostOverride: parseFloat(v) || null })}
+                                    prefix="$"
+                                    hint="Reduced invoice value for customs declaration"
+                                />
+                                <Input
+                                    label="Declared Shipping Total"
+                                    type="number"
+                                    value={customsPreview.shippingCostOverride || ''}
+                                    onChange={v => setCustomsPreview({ ...customsPreview, shippingCostOverride: parseFloat(v) || null })}
+                                    prefix="$"
+                                    hint="Reduced shipping cost for customs declaration"
+                                />
+                            </div>
+                        )}
                     </Card>
 
                     {/* Rate Overrides */}
@@ -293,6 +524,8 @@ function App() {
                             results={results}
                             items={items}
                             settings={settings}
+                            previewResults={previewResults}
+                            customsPreviewEnabled={customsPreview.enabled}
                         />
                     )}
                 </div>
