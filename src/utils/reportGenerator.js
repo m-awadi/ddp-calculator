@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatCurrency, formatNumber } from './formatters';
 
-export const generatePDFReport = (results, items, settings, previewResults = null) => {
+export const generatePDFReport = (results, items, settings, previewResults = null, reportName = '') => {
     if (!results) return null;
 
     const { summary, costs, itemBreakdowns, rates } = results;
@@ -25,6 +25,16 @@ export const generatePDFReport = (results, items, settings, previewResults = nul
     doc.setFontSize(9);
     doc.text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, margin + 3, yPos + 22);
     yPos += 30;
+
+    // Report Name (if provided)
+    if (reportName) {
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(52, 211, 153); // Emerald color
+        doc.text(reportName, pageWidth / 2, yPos, { align: 'center' });
+        doc.setTextColor(0, 0, 0); // Reset to black
+        yPos += 12;
+    }
 
     // Customs Preview Comparison (if applicable)
     if (previewResults) {
@@ -271,8 +281,8 @@ export const generatePDFReport = (results, items, settings, previewResults = nul
     return doc;
 };
 
-export const downloadPDFReport = (results, items, settings, filename = 'ddp-report.pdf', previewResults = null) => {
-    const doc = generatePDFReport(results, items, settings, previewResults);
+export const downloadPDFReport = (results, items, settings, filename = 'ddp-report.pdf', previewResults = null, reportName = '') => {
+    const doc = generatePDFReport(results, items, settings, previewResults, reportName);
     if (doc) {
         doc.save(filename);
     }

@@ -3,7 +3,7 @@ import CostRow from './CostRow';
 import { formatCurrency, formatNumber } from '../utils/formatters';
 import { downloadPDFReport } from '../utils/reportGenerator';
 
-const ResultsPanel = ({ results, items, settings, previewResults = null, customsPreviewEnabled = false }) => {
+const ResultsPanel = ({ results, items, settings, previewResults = null, customsPreviewEnabled = false, reportName = '' }) => {
     if (!results) return null;
 
     const { summary, costs, itemBreakdowns, rates } = results;
@@ -13,7 +13,18 @@ const ResultsPanel = ({ results, items, settings, previewResults = null, customs
     const handleDownloadReport = () => {
         const timestamp = new Date().toISOString().slice(0, 10);
         const filename = `DDP-Report-${timestamp}.pdf`;
-        downloadPDFReport(results, items, settings, filename, previewResults);
+        downloadPDFReport(results, items, settings, filename, previewResults, reportName);
+    };
+
+    const handleGenerateQuotation = () => {
+        const quotationItems = itemBreakdowns.map(item => ({
+            description: item.description,
+            quantity: item.quantity,
+            unitType: item.unitType,
+            ddpPerUnit: item.ddpPerUnit
+        }));
+        sessionStorage.setItem('quotationItems', JSON.stringify(quotationItems));
+        window.open('/quotation.html', '_blank');
     };
 
     return (
@@ -173,7 +184,7 @@ const ResultsPanel = ({ results, items, settings, previewResults = null, customs
                     bold
                 />
 
-                <div style={{ marginTop: '16px', textAlign: 'center' }}>
+                <div style={{ marginTop: '16px', display: 'flex', gap: '12px', justifyContent: 'center' }}>
                     <button
                         onClick={handleDownloadReport}
                         style={{
@@ -191,6 +202,24 @@ const ResultsPanel = ({ results, items, settings, previewResults = null, customs
                         onMouseLeave={e => e.target.style.transform = 'translateY(0)'}
                     >
                         📄 Download PDF Report
+                    </button>
+                    <button
+                        onClick={handleGenerateQuotation}
+                        style={{
+                            padding: '12px 24px',
+                            background: 'linear-gradient(135deg, var(--accent-emerald), var(--accent-cyan))',
+                            border: 'none',
+                            borderRadius: '8px',
+                            color: 'white',
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: '0.2s',
+                        }}
+                        onMouseEnter={e => e.target.style.transform = 'translateY(-2px)'}
+                        onMouseLeave={e => e.target.style.transform = 'translateY(0)'}
+                    >
+                        📝 Generate Quotation
                     </button>
                 </div>
             </Card>

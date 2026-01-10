@@ -89,7 +89,7 @@ describe('reportGenerator', () => {
                 {
                     description: 'Item 1',
                     quantity: 100,
-                    exwPrice: 10,
+                    unitPrice: 10,
                     cbmPerUnit: 0.05,
                     weightPerUnit: 3,
                     itemDdpTotal: 6167.43,
@@ -98,7 +98,7 @@ describe('reportGenerator', () => {
                 {
                     description: 'Item 2',
                     quantity: 50,
-                    exwPrice: 10,
+                    unitPrice: 10,
                     cbmPerUnit: 0.1,
                     weightPerUnit: 4,
                     itemDdpTotal: 3083.71,
@@ -114,14 +114,14 @@ describe('reportGenerator', () => {
             {
                 description: 'Item 1',
                 quantity: 100,
-                exwPrice: 10,
+                unitPrice: 10,
                 cbmPerUnit: 0.05,
                 weightPerUnit: 3
             },
             {
                 description: 'Item 2',
                 quantity: 50,
-                exwPrice: 10,
+                unitPrice: 10,
                 cbmPerUnit: 0.1,
                 weightPerUnit: 4
             }

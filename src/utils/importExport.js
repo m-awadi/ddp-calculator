@@ -18,7 +18,8 @@ export const generateTemplate = () => {
                 items: {
                     description: 'Product name or description',
                     quantity: 'Number of units',
-                    exwPrice: 'Price per unit in USD (EXW or FOB depending on pricing mode)',
+                    unitType: 'Unit type (e.g., pcs, roll, box) - optional',
+                    unitPrice: 'Price per unit in USD (EXW or FOB depending on pricing mode)',
                     cbmPerUnit: 'Volume per unit in cubic meters',
                     weightPerUnit: 'Weight per unit in kilograms',
                     cbmInputMode: 'perUnit or total',
@@ -32,14 +33,17 @@ export const generateTemplate = () => {
                     profitMarginMode: 'percentage or fixed',
                     commissionRate: 'Commission rate value',
                     commissionMode: 'percentage or fixed'
-                }
+                },
+                reportName: 'Optional supplier or customer name for report identification'
             }
         },
+        reportName: 'ABC Trading Company',
         items: [
             {
                 description: 'Sample Product A',
                 quantity: 100,
-                exwPrice: 12.50,
+                unitType: 'pcs',
+                unitPrice: 12.50,
                 cbmPerUnit: 0.15,
                 weightPerUnit: 5,
                 cbmInputMode: 'perUnit',
@@ -52,7 +56,8 @@ export const generateTemplate = () => {
             {
                 description: 'Sample Product B',
                 quantity: 200,
-                exwPrice: 8.75,
+                unitType: 'roll',
+                unitPrice: 8.75,
                 cbmPerUnit: 0.08,
                 weightPerUnit: 3,
                 cbmInputMode: 'perUnit',
@@ -107,12 +112,14 @@ export const downloadTemplate = (filename = 'DDP-Calculator-Template.json') => {
  * @param {Object} settings - The settings object
  * @param {Object} overrides - The overrides object
  * @param {Object} customsPreview - The customs preview settings
+ * @param {string} reportName - Optional report name
  * @returns {string} JSON string of all data
  */
-export const exportFormData = (items, settings, overrides, customsPreview) => {
+export const exportFormData = (items, settings, overrides, customsPreview, reportName = '') => {
     const data = {
         version: '1.0',
         timestamp: new Date().toISOString(),
+        reportName: reportName,
         items: items,
         settings: settings,
         overrides: overrides,
@@ -128,10 +135,11 @@ export const exportFormData = (items, settings, overrides, customsPreview) => {
  * @param {Object} settings - The settings object
  * @param {Object} overrides - The overrides object
  * @param {Object} customsPreview - The customs preview settings
+ * @param {string} reportName - Optional report name
  * @param {string} filename - Optional filename
  */
-export const downloadFormData = (items, settings, overrides, customsPreview, filename = null) => {
-    const jsonString = exportFormData(items, settings, overrides, customsPreview);
+export const downloadFormData = (items, settings, overrides, customsPreview, reportName = '', filename = null) => {
+    const jsonString = exportFormData(items, settings, overrides, customsPreview, reportName);
     const blob = new Blob([jsonString], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
 
@@ -168,8 +176,15 @@ export const validateImportData = (data) => {
     // Validate items structure
     for (let i = 0; i < data.items.length; i++) {
         const item = data.items[i];
-        if (typeof item.quantity === 'undefined' || typeof item.exwPrice === 'undefined' || typeof item.cbmPerUnit === 'undefined') {
+        // Support both old (exwPrice) and new (unitPrice) formats
+        const hasPrice = typeof item.unitPrice !== 'undefined' || typeof item.exwPrice !== 'undefined';
+        if (typeof item.quantity === 'undefined' || !hasPrice || typeof item.cbmPerUnit === 'undefined') {
             return { valid: false, error: `Item ${i + 1} is missing required fields` };
+        }
+        // Convert old format to new format
+        if (typeof item.exwPrice !== 'undefined' && typeof item.unitPrice === 'undefined') {
+            item.unitPrice = item.exwPrice;
+            delete item.exwPrice;
         }
     }
 
@@ -194,7 +209,8 @@ export const importFormData = (jsonString) => {
             items: data.items || [],
             settings: data.settings || {},
             overrides: data.overrides || {},
-            customsPreview: data.customsPreview || { enabled: false, invoiceCostOverride: null, shippingCostOverride: null }
+            customsPreview: data.customsPreview || { enabled: false, invoiceCostOverride: null, shippingCostOverride: null },
+            reportName: data.reportName || ''
         };
     } catch (error) {
         console.error('Error importing form data:', error);

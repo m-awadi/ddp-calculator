@@ -12,7 +12,7 @@ describe('Import/Export Functionality', () => {
             {
                 description: 'Test Product A',
                 quantity: 100,
-                exwPrice: 12.50,
+                unitPrice: 12.50,
                 cbmPerUnit: 0.15,
                 weightPerUnit: 5,
                 cbmInputMode: 'perUnit',
@@ -24,7 +24,7 @@ describe('Import/Export Functionality', () => {
             {
                 description: 'Test Product B',
                 quantity: 200,
-                exwPrice: 8.75,
+                unitPrice: 8.75,
                 cbmPerUnit: 0.08,
                 weightPerUnit: 3,
                 cbmInputMode: 'perUnit',

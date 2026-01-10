@@ -14,7 +14,7 @@ function App() {
 
     // State
     const [items, setItems] = useState([
-        { description: '', quantity: 1, exwPrice: 0, cbmPerUnit: 0.01, weightPerUnit: 0, cbmInputMode: 'perUnit', certifications: [] }
+        { description: '', quantity: 1, unitPrice: 0, unitType: '', cbmPerUnit: 0.01, weightPerUnit: 0, cbmInputMode: 'perUnit', certifications: [] }
     ]);
 
     const [settings, setSettings] = useState({
@@ -37,9 +37,11 @@ function App() {
         shippingCostOverride: null,
     });
 
+    const [reportName, setReportName] = useState('');
+
     // Item management
     const addItem = () => {
-        setItems([...items, { description: '', quantity: 1, exwPrice: 0, cbmPerUnit: 0.01, weightPerUnit: 0, cbmInputMode: 'perUnit', certifications: [] }]);
+        setItems([...items, { description: '', quantity: 1, unitPrice: 0, unitType: '', cbmPerUnit: 0.01, weightPerUnit: 0, cbmInputMode: 'perUnit', certifications: [] }]);
     };
 
     const removeItem = (index) => {
@@ -56,7 +58,7 @@ function App() {
 
     // Calculate results
     const results = useMemo(() => {
-        const validItems = items.filter(item => item.quantity > 0 && item.exwPrice > 0 && item.cbmPerUnit > 0);
+        const validItems = items.filter(item => item.quantity > 0 && item.unitPrice > 0 && item.cbmPerUnit > 0);
         if (validItems.length === 0) return null;
         return calculateDDP(validItems, settings, overrides);
     }, [items, settings, overrides]);
@@ -65,10 +67,10 @@ function App() {
     const previewResults = useMemo(() => {
         if (!customsPreview.enabled) return null;
 
-        const validItems = items.filter(item => item.quantity > 0 && item.exwPrice > 0 && item.cbmPerUnit > 0);
+        const validItems = items.filter(item => item.quantity > 0 && item.unitPrice > 0 && item.cbmPerUnit > 0);
         if (validItems.length === 0) return null;
 
-        const actualInvoiceTotal = validItems.reduce((sum, item) => sum + (item.exwPrice * item.quantity), 0);
+        const actualInvoiceTotal = validItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
         const actualResults = calculateDDP(validItems, settings, overrides);
         const actualFreightTotal = actualResults.costs.domesticChinaShipping + actualResults.costs.seaFreight;
 
@@ -78,7 +80,7 @@ function App() {
         // Adjust item prices proportionally
         const adjustedItems = validItems.map(item => ({
             ...item,
-            exwPrice: item.exwPrice * invoiceRatio,
+            unitPrice: item.unitPrice * invoiceRatio,
         }));
 
         // Override shipping costs for preview
@@ -94,7 +96,7 @@ function App() {
     // Import/Export handlers
     const handleExport = () => {
         try {
-            downloadFormData(items, settings, overrides, customsPreview);
+            downloadFormData(items, settings, overrides, customsPreview, reportName);
             console.log('Form data exported successfully');
         } catch (error) {
             console.error('Error exporting form data:', error);
@@ -112,6 +114,7 @@ function App() {
             setSettings(data.settings);
             setOverrides(data.overrides);
             setCustomsPreview(data.customsPreview);
+            setReportName(data.reportName || '');
             console.log('Form data imported successfully');
         } catch (error) {
             console.error('Error importing form data:', error);
@@ -457,6 +460,17 @@ function App() {
                                         : 'Domestic shipping included in price'}
                                 </p>
                             </div>
+
+                            {/* Report Name */}
+                            <div>
+                                <Input
+                                    label="Report Name (Optional)"
+                                    value={reportName}
+                                    onChange={v => setReportName(v)}
+                                    placeholder="Supplier or customer name"
+                                    hint="Appears on PDF report for identification"
+                                />
+                            </div>
                         </div>
                     </Card>
 
@@ -526,6 +540,7 @@ function App() {
                             settings={settings}
                             previewResults={previewResults}
                             customsPreviewEnabled={customsPreview.enabled}
+                            reportName={reportName}
                         />
                     )}
                 </div>

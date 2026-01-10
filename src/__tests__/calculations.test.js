@@ -169,7 +169,7 @@ describe('calculations', () => {
 
     describe('calculateDDP - Integration Tests', () => {
         const sampleItems = [
-            { description: 'Item 1', quantity: 100, exwPrice: 10, cbmPerUnit: 0.05, weightPerUnit: 1 }
+            { description: 'Item 1', quantity: 100, unitPrice: 10, cbmPerUnit: 0.05, weightPerUnit: 1 }
         ];
 
         const sampleSettings = {
@@ -273,8 +273,8 @@ describe('calculations', () => {
 
         it('should handle multiple items', () => {
             const multiItems = [
-                { description: 'Item 1', quantity: 50, exwPrice: 10, cbmPerUnit: 0.05, weightPerUnit: 1 },
-                { description: 'Item 2', quantity: 30, exwPrice: 20, cbmPerUnit: 0.1, weightPerUnit: 2 },
+                { description: 'Item 1', quantity: 50, unitPrice: 10, cbmPerUnit: 0.05, weightPerUnit: 1 },
+                { description: 'Item 2', quantity: 30, unitPrice: 20, cbmPerUnit: 0.1, weightPerUnit: 2 },
             ];
             const result = calculateDDP(multiItems, sampleSettings);
             expect(result.summary.totalItems).toBe(2);
@@ -284,8 +284,8 @@ describe('calculations', () => {
 
         it('should allocate costs proportionally across items', () => {
             const multiItems = [
-                { description: 'Item 1', quantity: 50, exwPrice: 10, cbmPerUnit: 0.05, weightPerUnit: 1 },
-                { description: 'Item 2', quantity: 30, exwPrice: 20, cbmPerUnit: 0.1, weightPerUnit: 2 },
+                { description: 'Item 1', quantity: 50, unitPrice: 10, cbmPerUnit: 0.05, weightPerUnit: 1 },
+                { description: 'Item 2', quantity: 30, unitPrice: 20, cbmPerUnit: 0.1, weightPerUnit: 2 },
             ];
             const result = calculateDDP(multiItems, sampleSettings);
             const totalAllocated = result.itemBreakdowns.reduce((sum, item) => sum + item.itemDdpTotal, 0);
@@ -311,7 +311,7 @@ describe('calculations', () => {
             const item = {
                 description: 'Test Product',
                 quantity: 100,
-                exwPrice: 10,
+                unitPrice: 10,
                 cbmPerUnit: 0.2, // 20 CBM total
                 weightPerUnit: 5,
             };
@@ -328,7 +328,7 @@ describe('calculations', () => {
             const item = {
                 description: 'Test Product',
                 quantity: 100,
-                exwPrice: 10,
+                unitPrice: 10,
                 cbmPerUnit: 0.65, // 65 CBM total
                 weightPerUnit: 5,
             };
@@ -345,7 +345,7 @@ describe('calculations', () => {
             const item = {
                 description: 'Test Product',
                 quantity: 100,
-                exwPrice: 10,
+                unitPrice: 10,
                 cbmPerUnit: 0.75, // 75 CBM total
                 weightPerUnit: 5,
             };
@@ -362,7 +362,7 @@ describe('calculations', () => {
             const item = {
                 description: 'Test Product',
                 quantity: 10,
-                exwPrice: 10,
+                unitPrice: 10,
                 cbmPerUnit: 0.5, // 5 CBM total (LCL threshold)
                 weightPerUnit: 5,
             };
@@ -378,7 +378,7 @@ describe('calculations', () => {
             const item = {
                 description: 'Test Product',
                 quantity: 1000,
-                exwPrice: 10,
+                unitPrice: 10,
                 cbmPerUnit: 0.15, // 150 CBM total
                 weightPerUnit: 5,
             };
@@ -395,7 +395,7 @@ describe('calculations', () => {
             const item = {
                 description: 'Test Product',
                 quantity: 100,
-                exwPrice: 10,
+                unitPrice: 10,
                 cbmPerUnit: 0.2, // 20 CBM total
                 weightPerUnit: 5,
             };
@@ -416,7 +416,7 @@ describe('calculations', () => {
             const item = {
                 description: 'Test Product',
                 quantity: 50,
-                exwPrice: 10,
+                unitPrice: 10,
                 cbmPerUnit: 0.5, // 25 CBM total
                 weightPerUnit: 5,
             };
@@ -434,7 +434,7 @@ describe('calculations', () => {
             const item = {
                 description: 'Test Product',
                 quantity: 0,
-                exwPrice: 10,
+                unitPrice: 10,
                 cbmPerUnit: 0,
                 weightPerUnit: 5,
             };

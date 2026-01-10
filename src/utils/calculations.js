@@ -145,7 +145,7 @@ export const calculateDDP = (items, settings, overrides = {}) => {
         const itemWeight = (item.weightPerUnit || 0) * item.quantity;
         totalCbm += itemCbm;
         totalWeight += itemWeight;
-        totalExwCost += item.exwPrice * item.quantity;
+        totalExwCost += item.unitPrice * item.quantity;
 
         // Add certification costs for this item
         if (item.certifications && Array.isArray(item.certifications)) {
@@ -227,7 +227,7 @@ export const calculateDDP = (items, settings, overrides = {}) => {
 
     // Per-item breakdown
     const itemBreakdowns = items.map(item => {
-        const itemTotal = item.exwPrice * item.quantity;
+        const itemTotal = item.unitPrice * item.quantity;
         const valueRatio = itemTotal / totalExwCost;
         const itemCbm = item.cbmPerUnit * item.quantity;
         const cbmRatio = itemCbm / totalCbm;

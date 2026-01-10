@@ -56,7 +56,7 @@ const ItemRow = ({ item, index, onUpdate, onRemove, pricingMode = 'EXW' }) => {
     return (
         <div style={{
             display: 'grid',
-            gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr auto',
+            gridTemplateColumns: '2fr 0.8fr 0.6fr 1fr 1.2fr 1fr auto',
             gap: '12px',
             padding: '16px',
             background: index % 2 === 0 ? 'var(--bg-card)' : 'transparent',
@@ -110,6 +110,29 @@ const ItemRow = ({ item, index, onUpdate, onRemove, pricingMode = 'EXW' }) => {
                 />
             </div>
 
+            {/* Unit */}
+            <div>
+                {index === 0 && (
+                    <label style={{
+                        display: 'block',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        color: 'var(--text-secondary)',
+                        marginBottom: '6px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                    }}>
+                        Unit
+                    </label>
+                )}
+                <Input
+                    label={null}
+                    value={item.unitType || ''}
+                    onChange={v => onUpdate(index, 'unitType', v)}
+                    placeholder="pcs"
+                />
+            </div>
+
             {/* EXW/FOB Price */}
             <div>
                 {index === 0 && (
@@ -128,8 +151,8 @@ const ItemRow = ({ item, index, onUpdate, onRemove, pricingMode = 'EXW' }) => {
                 <Input
                     label={null}
                     type="number"
-                    value={item.exwPrice}
-                    onChange={v => onUpdate(index, 'exwPrice', parseFloat(v) || 0)}
+                    value={item.unitPrice}
+                    onChange={v => onUpdate(index, 'unitPrice', parseFloat(v) || 0)}
                     prefix="$"
                     step="0.01"
                 />
