@@ -138,6 +138,7 @@ export const calculateDDP = (items, settings, overrides = {}) => {
     let totalCbm = 0;
     let totalWeight = 0;
     let totalExwCost = 0;
+    let totalCertificationCost = 0;
 
     items.forEach(item => {
         const itemCbm = item.cbmPerUnit * item.quantity;
@@ -145,6 +146,13 @@ export const calculateDDP = (items, settings, overrides = {}) => {
         totalCbm += itemCbm;
         totalWeight += itemWeight;
         totalExwCost += item.exwPrice * item.quantity;
+
+        // Add certification costs for this item
+        if (item.certifications && Array.isArray(item.certifications)) {
+            item.certifications.forEach(cert => {
+                totalCertificationCost += parseFloat(cert.cost) || 0;
+            });
+        }
     });
 
     // Select containers
@@ -184,8 +192,8 @@ export const calculateDDP = (items, settings, overrides = {}) => {
     const totalQatarChargesQar = Object.values(qatarCharges).reduce((a, b) => a + b, 0);
     const totalQatarChargesUsd = totalQatarChargesQar / rates.usdToQar;
 
-    // Certification cost
-    const certificationCost = rates.certificationCost;
+    // Certification cost (base + per-item certifications)
+    const certificationCost = rates.certificationCost + totalCertificationCost;
 
     // Total landed cost (before margin and commission)
     const landedCostBeforeMargin = totalExwCost + freightSubtotal + totalQatarChargesUsd + certificationCost + insurance;
@@ -217,14 +225,17 @@ export const calculateDDP = (items, settings, overrides = {}) => {
         const itemCbm = item.cbmPerUnit * item.quantity;
         const cbmRatio = itemCbm / totalCbm;
 
-        // Allocate costs
+        // Calculate item-specific certification cost
+        const itemCertificationCost = (item.certifications || []).reduce((sum, cert) => sum + (parseFloat(cert.cost) || 0), 0);
+
+        // Allocate costs (pro-rate base certification, but add item-specific certs directly)
         const allocatedFreight = freightSubtotal * cbmRatio;
         const allocatedQatarCharges = totalQatarChargesUsd * valueRatio;
-        const allocatedCertification = certificationCost * valueRatio;
+        const allocatedBaseCertification = rates.certificationCost * valueRatio;
         const allocatedInsurance = insurance * valueRatio;
 
         const itemLandedCost = itemTotal + allocatedFreight + allocatedQatarCharges +
-                               allocatedCertification + allocatedInsurance;
+                               allocatedBaseCertification + itemCertificationCost + allocatedInsurance;
 
         // Calculate profit margin (percentage or fixed USD)
         const itemMargin = settings.profitMarginMode === 'percentage'
@@ -248,7 +259,7 @@ export const calculateDDP = (items, settings, overrides = {}) => {
             cbmRatio,
             allocatedFreight,
             allocatedQatarCharges,
-            allocatedCertification,
+            allocatedCertification: allocatedBaseCertification + itemCertificationCost,
             allocatedInsurance,
             itemLandedCost,
             itemMargin,

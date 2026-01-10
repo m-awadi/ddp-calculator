@@ -1,243 +1,319 @@
-import { useState } from 'react';
-import { calculateDDP, calculateMofaFee, selectContainers } from './utils/calculations.js';
+import { useState, useMemo } from 'react';
+import { calculateDDP } from './utils/calculations.js';
 import { formatCurrency, formatNumber } from './utils/formatters.js';
 import { DEFAULT_RATES } from './utils/constants.js';
+import Card from './components/Card';
+import Input from './components/Input';
+import ItemRow from './components/ItemRow';
+import ResultsPanel from './components/ResultsPanel';
 
 function App() {
-  const [items, setItems] = useState([
-    { description: 'Sample Product', quantity: 100, exwPrice: 10, cbmPerUnit: 0.05, weightPerUnit: 1 }
-  ]);
+    // State
+    const [items, setItems] = useState([
+        { description: '', quantity: 1, exwPrice: 0, cbmPerUnit: 0.01, weightPerUnit: 0, cbmInputMode: 'perUnit', certifications: [] }
+    ]);
 
-  const [settings] = useState({
-    containerType: 'auto',
-    profitMargin: 0.15,
-    profitMarginMode: 'percentage',
-    commissionRate: 0.06,
-    commissionMode: 'percentage',
-  });
+    const [settings, setSettings] = useState({
+        containerType: 'auto',
+        profitMargin: 0,
+        profitMarginMode: 'percentage',
+        commissionRate: 0,
+        commissionMode: 'percentage',
+    });
 
-  const results = calculateDDP(items, settings);
+    const [overrides, setOverrides] = useState({
+        seaFreightOverride: null,
+        domesticChinaPerCbmOverride: null,
+    });
 
-  return (
-    <div style={{ minHeight: '100vh', padding: '2rem' }}>
-      {/* Header */}
-      <div style={{
-        background: 'linear-gradient(135deg, #3b82f6, #06b6d4)',
-        padding: '2rem',
-        borderRadius: '12px',
-        marginBottom: '2rem',
-        textAlign: 'center'
-      }}>
-        <h1 style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>
-          🚢 DDP Calculator
-        </h1>
-        <p style={{ fontSize: '1.1rem', opacity: 0.9 }}>
-          Modular Vite/React Version - Demo
-        </p>
-      </div>
+    // Item management
+    const addItem = () => {
+        setItems([...items, { description: '', quantity: 1, exwPrice: 0, cbmPerUnit: 0.01, weightPerUnit: 0, cbmInputMode: 'perUnit', certifications: [] }]);
+    };
 
-      {/* Info Banner */}
-      <div style={{
-        background: '#1a2234',
-        border: '2px solid #3b82f6',
-        padding: '1.5rem',
-        borderRadius: '8px',
-        marginBottom: '2rem'
-      }}>
-        <h3 style={{ color: '#3b82f6', marginBottom: '0.5rem' }}>✨ This is the modular version!</h3>
-        <p style={{ color: '#94a3b8', marginBottom: '1rem' }}>
-          This demo uses the tested ES6 modules from <code style={{ background: '#0d1321', padding: '0.2rem 0.4rem', borderRadius: '4px' }}>src/utils/</code>
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-          <div style={{ background: '#0d1321', padding: '1rem', borderRadius: '6px' }}>
-            <strong style={{ color: '#10b981' }}>✅ Working:</strong>
-            <ul style={{ marginTop: '0.5rem', color: '#94a3b8', fontSize: '0.9rem' }}>
-              <li>ES6 module imports</li>
-              <li>Tested calculations (55 tests)</li>
-              <li>Vite dev server</li>
-            </ul>
-          </div>
-          <div style={{ background: '#0d1321', padding: '1rem', borderRadius: '6px' }}>
-            <strong style={{ color: '#f59e0b' }}>⚠️ In Progress:</strong>
-            <ul style={{ marginTop: '0.5rem', color: '#94a3b8', fontSize: '0.9rem' }}>
-              <li>Full UI extraction</li>
-              <li>All components</li>
-              <li>Complete feature parity</li>
-            </ul>
-          </div>
+    const removeItem = (index) => {
+        if (items.length > 1) {
+            setItems(items.filter((_, i) => i !== index));
+        }
+    };
+
+    const updateItem = (index, field, value) => {
+        const updated = [...items];
+        updated[index][field] = value;
+        setItems(updated);
+    };
+
+    // Calculate results
+    const results = useMemo(() => {
+        const validItems = items.filter(item => item.quantity > 0 && item.exwPrice > 0 && item.cbmPerUnit > 0);
+        if (validItems.length === 0) return null;
+        return calculateDDP(validItems, settings, overrides);
+    }, [items, settings, overrides]);
+
+    return (
+        <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+            <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem' }}>
+                {/* Header */}
+                <div style={{
+                    background: 'linear-gradient(135deg, #3b82f6, #06b6d4)',
+                    padding: '2.5rem',
+                    borderRadius: '16px',
+                    marginBottom: '2rem',
+                    textAlign: 'center',
+                    boxShadow: '0 20px 60px rgba(59, 130, 246, 0.3)',
+                }}>
+                    <h1 style={{ fontSize: '3rem', marginBottom: '0.5rem', fontWeight: '700' }}>
+                        🚢 DDP Calculator
+                    </h1>
+                    <p style={{ fontSize: '1.1rem', opacity: 0.95 }}>
+                        Professional China-Qatar Shipping Cost Calculator
+                    </p>
+                    <div style={{ marginTop: '1rem', fontSize: '0.9rem', opacity: 0.85 }}>
+                        1 USD = {DEFAULT_RATES.usdToQar} QAR
+                    </div>
+                </div>
+
+                <div style={{ display: 'grid', gap: '2rem' }}>
+                    {/* Items Section */}
+                    <Card title="📦 Items" accent="var(--accent-blue)">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {items.map((item, index) => (
+                                <ItemRow
+                                    key={index}
+                                    item={item}
+                                    index={index}
+                                    onUpdate={updateItem}
+                                    onRemove={removeItem}
+                                />
+                            ))}
+                        </div>
+                        <button
+                            onClick={addItem}
+                            style={{
+                                marginTop: '16px',
+                                padding: '12px 24px',
+                                background: 'var(--accent-blue)',
+                                border: 'none',
+                                borderRadius: '8px',
+                                color: 'white',
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: '0.2s',
+                            }}
+                            onMouseEnter={e => e.target.style.transform = 'translateY(-2px)'}
+                            onMouseLeave={e => e.target.style.transform = 'translateY(0)'}
+                        >
+                            + Add Item
+                        </button>
+                    </Card>
+
+                    {/* Shipment Settings */}
+                    <Card title="⚙️ Shipment Settings" accent="var(--accent-cyan)">
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
+                            {/* Container Type */}
+                            <div>
+                                <label style={{
+                                    display: 'block',
+                                    fontSize: '12px',
+                                    fontWeight: '600',
+                                    color: 'var(--text-secondary)',
+                                    marginBottom: '8px',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px'
+                                }}>
+                                    Container Type
+                                </label>
+                                <select
+                                    value={settings.containerType}
+                                    onChange={e => setSettings({ ...settings, containerType: e.target.value })}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        background: 'var(--bg-input)',
+                                        border: '1px solid var(--border)',
+                                        borderRadius: '6px',
+                                        color: 'var(--text-primary)',
+                                        fontSize: '14px',
+                                        cursor: 'pointer',
+                                        outline: 'none',
+                                    }}
+                                >
+                                    <option value="auto">Auto-select (Recommended)</option>
+                                    <option value="20GP">20' Standard (33 CBM)</option>
+                                    <option value="40GP">40' Standard (67 CBM)</option>
+                                    <option value="40HC">40' High Cube (76 CBM)</option>
+                                </select>
+                            </div>
+
+                            {/* Profit Margin */}
+                            <div>
+                                <label style={{
+                                    display: 'block',
+                                    fontSize: '12px',
+                                    fontWeight: '600',
+                                    color: 'var(--text-secondary)',
+                                    marginBottom: '8px',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px'
+                                }}>
+                                    Profit Margin
+                                </label>
+                                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                                    <button
+                                        onClick={() => setSettings({ ...settings, profitMarginMode: 'percentage', profitMargin: 0 })}
+                                        style={{
+                                            flex: 1,
+                                            padding: '6px',
+                                            fontSize: '12px',
+                                            background: settings.profitMarginMode === 'percentage' ? 'var(--accent-emerald)' : 'var(--bg-secondary)',
+                                            border: '1px solid var(--border)',
+                                            borderRadius: '6px',
+                                            color: settings.profitMarginMode === 'percentage' ? 'white' : 'var(--text-muted)',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        Percentage
+                                    </button>
+                                    <button
+                                        onClick={() => setSettings({ ...settings, profitMarginMode: 'fixed', profitMargin: 0 })}
+                                        style={{
+                                            flex: 1,
+                                            padding: '6px',
+                                            fontSize: '12px',
+                                            background: settings.profitMarginMode === 'fixed' ? 'var(--accent-emerald)' : 'var(--bg-secondary)',
+                                            border: '1px solid var(--border)',
+                                            borderRadius: '6px',
+                                            color: settings.profitMarginMode === 'fixed' ? 'white' : 'var(--text-muted)',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        Fixed USD
+                                    </button>
+                                </div>
+                                <Input
+                                    type="number"
+                                    value={settings.profitMarginMode === 'percentage' ? settings.profitMargin * 100 : settings.profitMargin}
+                                    onChange={v => setSettings({
+                                        ...settings,
+                                        profitMargin: settings.profitMarginMode === 'percentage' ? parseFloat(v) / 100 : parseFloat(v)
+                                    })}
+                                    prefix={settings.profitMarginMode === 'percentage' ? null : '$'}
+                                    suffix={settings.profitMarginMode === 'percentage' ? '%' : null}
+                                    step={settings.profitMarginMode === 'percentage' ? '0.1' : '1'}
+                                />
+                            </div>
+
+                            {/* Commission */}
+                            <div>
+                                <label style={{
+                                    display: 'block',
+                                    fontSize: '12px',
+                                    fontWeight: '600',
+                                    color: 'var(--text-secondary)',
+                                    marginBottom: '8px',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px'
+                                }}>
+                                    Commission
+                                </label>
+                                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                                    <button
+                                        onClick={() => setSettings({ ...settings, commissionMode: 'percentage', commissionRate: 0 })}
+                                        style={{
+                                            flex: 1,
+                                            padding: '6px',
+                                            fontSize: '12px',
+                                            background: settings.commissionMode === 'percentage' ? 'var(--accent-purple)' : 'var(--bg-secondary)',
+                                            border: '1px solid var(--border)',
+                                            borderRadius: '6px',
+                                            color: settings.commissionMode === 'percentage' ? 'white' : 'var(--text-muted)',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        Percentage
+                                    </button>
+                                    <button
+                                        onClick={() => setSettings({ ...settings, commissionMode: 'fixed', commissionRate: 0 })}
+                                        style={{
+                                            flex: 1,
+                                            padding: '6px',
+                                            fontSize: '12px',
+                                            background: settings.commissionMode === 'fixed' ? 'var(--accent-purple)' : 'var(--bg-secondary)',
+                                            border: '1px solid var(--border)',
+                                            borderRadius: '6px',
+                                            color: settings.commissionMode === 'fixed' ? 'white' : 'var(--text-muted)',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        Fixed USD
+                                    </button>
+                                </div>
+                                <Input
+                                    type="number"
+                                    value={settings.commissionMode === 'percentage' ? settings.commissionRate * 100 : settings.commissionRate}
+                                    onChange={v => setSettings({
+                                        ...settings,
+                                        commissionRate: settings.commissionMode === 'percentage' ? parseFloat(v) / 100 : parseFloat(v)
+                                    })}
+                                    prefix={settings.commissionMode === 'percentage' ? null : '$'}
+                                    suffix={settings.commissionMode === 'percentage' ? '%' : null}
+                                    step={settings.commissionMode === 'percentage' ? '0.1' : '1'}
+                                />
+                            </div>
+                        </div>
+                    </Card>
+
+                    {/* Rate Overrides */}
+                    <Card title="🔧 Rate Overrides (Optional)" accent="var(--accent-amber)" collapsible defaultOpen={false}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
+                            <Input
+                                label="Sea Freight Total"
+                                type="number"
+                                value={overrides.seaFreightOverride || ''}
+                                onChange={v => setOverrides({ ...overrides, seaFreightOverride: v ? parseFloat(v) : null })}
+                                prefix="$"
+                                hint="Override calculated sea freight cost"
+                            />
+                            <Input
+                                label="Domestic China Shipping"
+                                type="number"
+                                value={overrides.domesticChinaPerCbmOverride || ''}
+                                onChange={v => setOverrides({ ...overrides, domesticChinaPerCbmOverride: v ? parseFloat(v) : null })}
+                                prefix="$"
+                                suffix="per CBM"
+                                hint={`Default: $${DEFAULT_RATES.domesticChinaPerCbm}/CBM`}
+                            />
+                        </div>
+                    </Card>
+
+                    {/* Results */}
+                    {results && (
+                        <ResultsPanel
+                            results={results}
+                            items={items}
+                            settings={settings}
+                        />
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div style={{
+                    marginTop: '3rem',
+                    padding: '2rem',
+                    textAlign: 'center',
+                    color: 'var(--text-muted)',
+                    fontSize: '0.9rem',
+                    borderTop: '1px solid var(--border)',
+                }}>
+                    <p>Built with ❤️ for Arabian Trade Route</p>
+                    <p style={{ marginTop: '0.5rem' }}>
+                        Powered by React + Vite | All calculations based on official CMA CGM & Qatar MOFA rates
+                    </p>
+                </div>
+            </div>
         </div>
-        <p style={{ color: '#64748b', fontSize: '0.9rem' }}>
-          <strong>For full functionality:</strong> Use <code style={{ background: '#0d1321', padding: '0.2rem 0.4rem', borderRadius: '4px' }}>index.old.html</code> (standalone version with all features)
-        </p>
-      </div>
-
-      {/* Demo Calculation */}
-      {results && (
-        <div style={{ display: 'grid', gap: '1.5rem' }}>
-          {/* Summary Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-            <SummaryCard
-              label="Total CIF"
-              value={formatCurrency(results.costs.cifValue)}
-              subValue={formatCurrency(results.costs.cifValueQar, 'QAR')}
-              color="#3b82f6"
-            />
-            <SummaryCard
-              label="Customs Duties"
-              value={formatCurrency(results.costs.qatarCharges.customsDuty / DEFAULT_RATES.usdToQar)}
-              subValue={formatCurrency(results.costs.qatarCharges.customsDuty, 'QAR')}
-              color="#f59e0b"
-            />
-            <SummaryCard
-              label="Total DDP"
-              value={formatCurrency(results.costs.ddpTotal)}
-              subValue={formatCurrency(results.costs.ddpTotal * DEFAULT_RATES.usdToQar, 'QAR')}
-              color="#10b981"
-            />
-          </div>
-
-          {/* Calculation Details */}
-          <div style={{
-            background: '#1a2234',
-            padding: '1.5rem',
-            borderRadius: '8px',
-            border: '1px solid #2a3548'
-          }}>
-            <h3 style={{ marginBottom: '1rem', color: '#3b82f6' }}>📊 Calculation Details</h3>
-            <div style={{ display: 'grid', gap: '0.5rem', fontSize: '0.95rem' }}>
-              <DetailRow label="Total Items" value={results.summary.totalItems} />
-              <DetailRow label="Total Quantity" value={results.summary.totalQuantity} />
-              <DetailRow label="Total CBM" value={`${formatNumber(results.summary.totalCbm, 2)} m³`} />
-              <DetailRow label="Containers" value={results.summary.containers.join(', ')} />
-              <DetailRow label="Sea Freight" value={formatCurrency(results.costs.seaFreight)} />
-              <DetailRow label="Insurance" value={formatCurrency(results.costs.insurance)} />
-              <DetailRow label="Profit Margin" value={formatCurrency(results.costs.profitMargin)} />
-              <DetailRow label="Commission" value={formatCurrency(results.costs.commission)} />
-            </div>
-          </div>
-
-          {/* Module Functions Demo */}
-          <div style={{
-            background: '#1a2234',
-            padding: '1.5rem',
-            borderRadius: '8px',
-            border: '1px solid #2a3548'
-          }}>
-            <h3 style={{ marginBottom: '1rem', color: '#10b981' }}>🧪 Module Functions Demo</h3>
-            <div style={{ display: 'grid', gap: '1rem' }}>
-              <FunctionDemo
-                name="calculateMofaFee(50000)"
-                result={`QAR ${calculateMofaFee(50000)}`}
-                description="Tiered MOFA attestation fee"
-              />
-              <FunctionDemo
-                name="selectContainers(100)"
-                result={selectContainers(100).join(', ')}
-                description="Optimal container selection"
-              />
-              <FunctionDemo
-                name="formatCurrency(1234.56, 'QAR')"
-                result={formatCurrency(1234.56, 'QAR')}
-                description="Currency formatting utility"
-              />
-            </div>
-          </div>
-
-          {/* Test Status */}
-          <div style={{
-            background: 'linear-gradient(135deg, #10b981, #059669)',
-            padding: '1.5rem',
-            borderRadius: '8px',
-            textAlign: 'center'
-          }}>
-            <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>✅</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-              55 Tests Passing
-            </div>
-            <div style={{ opacity: 0.9 }}>
-              All calculation modules are thoroughly tested and verified
-            </div>
-            <div style={{ marginTop: '1rem', fontSize: '0.9rem', opacity: 0.8 }}>
-              Run <code style={{ background: 'rgba(0,0,0,0.3)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>npm test</code> to see results
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Footer */}
-      <div style={{
-        marginTop: '3rem',
-        textAlign: 'center',
-        color: '#64748b',
-        fontSize: '0.9rem',
-        padding: '2rem',
-        borderTop: '1px solid #2a3548'
-      }}>
-        <p>
-          This is a minimal demo of the modular architecture. For the full-featured application,
-          please use <strong style={{ color: '#3b82f6' }}>index.old.html</strong>
-        </p>
-        <p style={{ marginTop: '0.5rem' }}>
-          Built with ❤️ using Vite + React + Tested ES6 Modules
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function SummaryCard({ label, value, subValue, color }) {
-  return (
-    <div style={{
-      background: '#1a2234',
-      padding: '1.5rem',
-      borderRadius: '8px',
-      border: '1px solid #2a3548'
-    }}>
-      <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '0.5rem' }}>
-        {label}
-      </div>
-      <div style={{ fontSize: '1.75rem', fontWeight: 'bold', color, marginBottom: '0.25rem' }}>
-        {value}
-      </div>
-      <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-        {subValue}
-      </div>
-    </div>
-  );
-}
-
-function DetailRow({ label, value }) {
-  return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      padding: '0.5rem',
-      background: '#0d1321',
-      borderRadius: '4px'
-    }}>
-      <span style={{ color: '#94a3b8' }}>{label}:</span>
-      <span style={{ color: '#f1f5f9', fontWeight: '500' }}>{value}</span>
-    </div>
-  );
-}
-
-function FunctionDemo({ name, result, description }) {
-  return (
-    <div style={{
-      background: '#0d1321',
-      padding: '1rem',
-      borderRadius: '6px',
-      border: '1px solid #059669'
-    }}>
-      <code style={{ color: '#10b981', fontSize: '0.9rem' }}>{name}</code>
-      <div style={{ color: '#f1f5f9', marginTop: '0.5rem', fontWeight: '600' }}>
-        → {result}
-      </div>
-      <div style={{ color: '#64748b', fontSize: '0.85rem', marginTop: '0.25rem' }}>
-        {description}
-      </div>
-    </div>
-  );
+    );
 }
 
 export default App;
