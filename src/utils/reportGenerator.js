@@ -30,9 +30,6 @@ export const generatePDFReport = async (results, items, settings, previewResults
     const contentWidth = pageWidth - 2 * margin;
     let yPos = margin;
 
-    // Load footer image
-    const footerImage = await loadImageAsBase64('/footer.png');
-
     // Header
     doc.setFillColor(59, 130, 246);
     doc.roundedRect(margin, yPos, contentWidth, 25, 3, 3, 'F');
@@ -305,21 +302,9 @@ export const generatePDFReport = async (results, items, settings, previewResults
     yPos += 4;
     doc.text('Generated with Claude Code | All calculations based on official rates', margin, yPos);
 
-    // Add footer image to last page
+    // Footer removed per user request
     const pageCount = doc.internal.getNumberOfPages();
     doc.setPage(pageCount);
-
-    if (footerImage) {
-        try {
-            const footerMaxWidth = 80;
-            const footerMaxHeight = 25;
-            const footerX = pageWidth - margin - footerMaxWidth;
-            const footerY = pageHeight - margin - footerMaxHeight - 35;
-            doc.addImage(footerImage, 'PNG', footerX, footerY, footerMaxWidth, footerMaxHeight);
-        } catch (e) {
-            console.error('Error adding footer:', e);
-        }
-    }
 
     return doc;
 };

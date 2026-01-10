@@ -3,11 +3,12 @@ import { QUOTATION_COLORS } from '../utils/defaultTerms';
 
 const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn = true }) => {
     const [imagePreview, setImagePreview] = useState(item.image || null);
+    const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef(null);
+    const dropZoneRef = useRef(null);
 
-    const handleImageUpload = (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+    const processImageFile = (file) => {
+        if (!file || !file.type.startsWith('image/')) return;
 
         const reader = new FileReader();
         reader.onload = (event) => {
@@ -46,6 +47,53 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
         reader.readAsDataURL(file);
     };
 
+    const handleImageUpload = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        processImageFile(file);
+    };
+
+    const handlePaste = (e) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.type.startsWith('image/')) {
+                const file = item.getAsFile();
+                if (file) {
+                    e.preventDefault();
+                    processImageFile(file);
+                    break;
+                }
+            }
+        }
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+
+        const files = e.dataTransfer?.files;
+        if (files && files.length > 0) {
+            const file = files[0];
+            processImageFile(file);
+        }
+    };
+
     const removeImage = () => {
         setImagePreview(null);
         onUpdate(index, 'image', null);
@@ -74,19 +122,29 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                     width: '320px',
                     verticalAlign: 'middle'
                 }}>
-                    <div style={{
-                        width: '310px',
-                        height: '310px',
-                        border: `2px dashed ${QUOTATION_COLORS.textMuted}40`,
-                        borderRadius: '8px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: QUOTATION_COLORS.white,
-                        position: 'relative',
-                        margin: '0 auto'
-                    }}>
+                    <div
+                        ref={dropZoneRef}
+                        onPaste={handlePaste}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        tabIndex={0}
+                        style={{
+                            width: '310px',
+                            height: '310px',
+                            border: `2px dashed ${isDragging ? QUOTATION_COLORS.primary : QUOTATION_COLORS.textMuted}40`,
+                            borderRadius: '8px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: isDragging ? `${QUOTATION_COLORS.primary}10` : QUOTATION_COLORS.white,
+                            position: 'relative',
+                            margin: '0 auto',
+                            transition: 'all 0.2s ease',
+                            outline: 'none'
+                        }}
+                    >
                         {imagePreview ? (
                             <>
                                 <img
@@ -129,28 +187,49 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                                     onChange={handleImageUpload}
                                     style={{ display: 'none' }}
                                 />
-                                <button
-                                    onClick={() => fileInputRef.current?.click()}
-                                    style={{
-                                        padding: '8px 16px',
-                                        background: QUOTATION_COLORS.primary,
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '6px',
-                                        cursor: 'pointer',
-                                        fontSize: '13px',
-                                        fontWeight: '500'
-                                    }}
-                                >
-                                    Upload Image
-                                </button>
-                                <span style={{
-                                    marginTop: '8px',
-                                    fontSize: '11px',
-                                    color: QUOTATION_COLORS.textMuted
-                                }}>
-                                    Max 300x300px
-                                </span>
+                                {isDragging ? (
+                                    <div style={{
+                                        fontSize: '14px',
+                                        color: QUOTATION_COLORS.primary,
+                                        fontWeight: '600',
+                                        textAlign: 'center'
+                                    }}>
+                                        Drop image here
+                                    </div>
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={() => fileInputRef.current?.click()}
+                                            style={{
+                                                padding: '8px 16px',
+                                                background: QUOTATION_COLORS.primary,
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '6px',
+                                                cursor: 'pointer',
+                                                fontSize: '13px',
+                                                fontWeight: '500'
+                                            }}
+                                        >
+                                            Upload Image
+                                        </button>
+                                        <span style={{
+                                            marginTop: '8px',
+                                            fontSize: '11px',
+                                            color: QUOTATION_COLORS.textMuted,
+                                            textAlign: 'center'
+                                        }}>
+                                            Click to upload, drag & drop, or paste
+                                        </span>
+                                        <span style={{
+                                            marginTop: '4px',
+                                            fontSize: '11px',
+                                            color: QUOTATION_COLORS.textMuted
+                                        }}>
+                                            Max 300x300px
+                                        </span>
+                                    </>
+                                )}
                             </>
                         )}
                     </div>
