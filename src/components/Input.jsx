@@ -1,14 +1,19 @@
 const Input = ({ label, type = 'text', value, onChange, prefix, suffix, hint, step, placeholder, min }) => {
+    // Generate a unique ID for the input
+    const inputId = label ? `input-${label.replace(/\s+/g, '-').toLowerCase()}` : undefined;
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {label && (
-                <label style={{
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    color: 'var(--text-secondary)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                }}>
+                <label
+                    htmlFor={inputId}
+                    style={{
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        color: 'var(--text-secondary)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                    }}>
                     {label}
                 </label>
             )}
@@ -27,6 +32,7 @@ const Input = ({ label, type = 'text', value, onChange, prefix, suffix, hint, st
                     </span>
                 )}
                 <input
+                    id={inputId}
                     type={type}
                     value={value}
                     onChange={(e) => onChange(e.target.value)}

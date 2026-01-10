@@ -26,6 +26,9 @@ const ResultsPanel = ({ results, items, settings, reportName = '' }) => {
     };
 
     const formatCurrency = (amount, currency = 'USD') => {
+        if (amount === undefined || amount === null || isNaN(amount)) {
+            return currency === 'QAR' ? 'QAR 0.00' : '$0.00';
+        }
         if (currency === 'QAR') {
             return `QAR ${amount.toFixed(2)}`;
         }

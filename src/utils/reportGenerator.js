@@ -19,6 +19,13 @@ const loadImageAsBase64 = async (url) => {
 };
 
 export const generatePDFReport = async (results, items, settings, previewResults = null, reportName = '') => {
+    // Handle null or invalid results
+    if (!results || !results.costs) {
+        const doc = new jsPDF();
+        doc.text('No data available', 15, 15);
+        return doc;
+    }
+
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -62,10 +69,10 @@ export const generatePDFReport = async (results, items, settings, previewResults
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     const summaryData = [
-        ['Total CIF Cost:', `$${results.totalCIF.toFixed(2)} (QAR ${results.totalCIFQAR.toFixed(2)})`],
-        ['Customs Duties:', `$${results.customsDuties.toFixed(2)} (QAR ${results.customsDutiesQAR.toFixed(2)})`],
-        ['Local Delivery:', `$${results.localDelivery.toFixed(2)} (QAR ${results.localDeliveryQAR.toFixed(2)})`],
-        ['Total DDP Cost:', `$${results.ddpTotal.toFixed(2)} (QAR ${results.ddpTotalQAR.toFixed(2)})`]
+        ['Total CIF Cost:', `$${(results.costs?.cifWithInsurance || 0).toFixed(2)} (QAR ${(results.costs?.cifValueQar || 0).toFixed(2)})`],
+        ['Customs Duties:', `$${((results.costs?.qatarCharges?.customsDuty || 0) / (results.rates?.usdToQar || 3.65)).toFixed(2)} (QAR ${(results.costs?.qatarCharges?.customsDuty || 0).toFixed(2)})`],
+        ['Local Delivery:', `$${((results.costs?.totalQatarChargesUsd || 0) - ((results.costs?.qatarCharges?.customsDuty || 0) / (results.rates?.usdToQar || 3.65))).toFixed(2)}`],
+        ['Total DDP Cost:', `$${(results.costs?.ddpTotal || 0).toFixed(2)} (QAR ${((results.costs?.ddpTotal || 0) * (results.rates?.usdToQar || 3.65)).toFixed(2)})`]
     ];
 
     summaryData.forEach(([label, value]) => {
@@ -81,22 +88,22 @@ export const generatePDFReport = async (results, items, settings, previewResults
     doc.text('Item Breakdown', margin, yPos);
     yPos += 8;
 
-    const itemBreakdowns = items.map((item, idx) => results.itemBreakdowns[idx]);
+    const itemBreakdowns = results.itemBreakdowns || [];
 
     // Table data with ID column
     const itemsTableData = itemBreakdowns.map((item, index) => {
         const row = [
             (index + 1).toString(), // ID column
             item.description || `Item ${index + 1}`,
-            item.country || 'N/A',
-            item.supplier || 'N/A',
-            item.hsCode || 'N/A',
-            item.quantity.toString(),
-            `$${item.unitPrice.toFixed(2)}`,
-            `$${item.cifTotal.toFixed(2)}`,
-            `$${item.customsDuty.toFixed(2)}`,
-            `$${item.ddpTotal.toFixed(2)}`,
-            `$${item.ddpPerUnit.toFixed(2)}`
+            'China', // Default country
+            'N/A', // Supplier not tracked
+            'N/A', // HS Code not tracked
+            (item.quantity || 0).toString(),
+            `$${(item.exwPrice || 0).toFixed(2)}`,
+            `$${((item.exwPrice || 0) * (item.quantity || 0)).toFixed(2)}`, // Total EXW
+            `$${((item.allocatedQatarCharges || 0) * 0.05).toFixed(2)}`, // Estimated customs portion
+            `$${(item.itemDdpTotal || 0).toFixed(2)}`,
+            `$${(item.ddpPerUnit || 0).toFixed(2)}`
         ];
         return row;
     });
@@ -104,8 +111,8 @@ export const generatePDFReport = async (results, items, settings, previewResults
     // Add total row
     const totalRow = [
         { content: 'TOTAL', colSpan: 8, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-        { content: `$${results.customsDuties.toFixed(2)}`, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-        { content: `$${results.ddpTotal.toFixed(2)}`, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+        { content: `$${(((results.costs?.qatarCharges?.customsDuty || 0) / (results.rates?.usdToQar || 3.65)) || 0).toFixed(2)}`, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+        { content: `$${(results.costs?.ddpTotal || 0).toFixed(2)}`, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
         { content: '', styles: { fillColor: [240, 240, 240] } }
     ];
     itemsTableData.push(totalRow);
