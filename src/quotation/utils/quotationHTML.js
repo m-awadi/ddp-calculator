@@ -35,14 +35,14 @@ export const generateQuotationHTML = (data) => {
     <title>${companyInfo.name} - Quotation - ${formattedDate}</title>
 
     <!-- Preload fonts for faster loading -->
-    <link rel="preload" href="/Roboto/static/Roboto-Regular.ttf" as="font" type="font/ttf" crossorigin>
-    <link rel="preload" href="/Roboto/static/Roboto-Medium.ttf" as="font" type="font/ttf" crossorigin>
-    <link rel="preload" href="/Roboto/static/Roboto-Bold.ttf" as="font" type="font/ttf" crossorigin>
+    <link rel="preload" href="/Roboto/static/roboto/Roboto-Regular.ttf" as="font" type="font/ttf" crossorigin>
+    <link rel="preload" href="/Roboto/static/roboto/Roboto-Medium.ttf" as="font" type="font/ttf" crossorigin>
+    <link rel="preload" href="/Roboto/static/roboto/Roboto-Bold.ttf" as="font" type="font/ttf" crossorigin>
 
     <style>
         @font-face {
             font-family: 'Roboto';
-            src: url('/Roboto/static/Roboto-Regular.ttf') format('truetype');
+            src: url('/Roboto/static/roboto/Roboto-Regular.ttf') format('truetype');
             font-weight: 400;
             font-style: normal;
             font-display: block;
@@ -50,7 +50,7 @@ export const generateQuotationHTML = (data) => {
 
         @font-face {
             font-family: 'Roboto';
-            src: url('/Roboto/static/Roboto-Medium.ttf') format('truetype');
+            src: url('/Roboto/static/roboto/Roboto-Medium.ttf') format('truetype');
             font-weight: 500;
             font-style: normal;
             font-display: block;
@@ -58,7 +58,7 @@ export const generateQuotationHTML = (data) => {
 
         @font-face {
             font-family: 'Roboto';
-            src: url('/Roboto/static/Roboto-Bold.ttf') format('truetype');
+            src: url('/Roboto/static/roboto/Roboto-Bold.ttf') format('truetype');
             font-weight: 700;
             font-style: normal;
             font-display: block;
