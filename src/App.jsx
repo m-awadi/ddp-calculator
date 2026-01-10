@@ -222,10 +222,10 @@ function App() {
                     <h1 style={{ fontSize: '3rem', marginBottom: '0.5rem', fontWeight: '700' }}>
                         🚢 DDP Calculator
                     </h1>
-                    <p style={{ fontSize: '1.1rem', opacity: 0.95' }}>
+                    <p style={{ fontSize: '1.1rem', opacity: 0.95 }}>
                         Professional China-Qatar Shipping Cost Calculator
                     </p>
-                    <div style={{ marginTop: '1rem', fontSize: '0.9rem', opacity: 0.85' }}>
+                    <div style={{ marginTop: '1rem', fontSize: '0.9rem', opacity: 0.85 }}>
                         1 USD = {DEFAULT_RATES.usdToQar} QAR
                     </div>
                 </div>
