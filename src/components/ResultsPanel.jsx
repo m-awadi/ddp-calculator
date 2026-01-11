@@ -33,7 +33,23 @@ const ResultsPanel = ({ results, items, settings, previewResults = null, customs
         }));
         sessionStorage.setItem('quotationItems', JSON.stringify(quotationItems));
         // Use relative path to stay within the same directory/route
-        window.open('quotation.html', '_blank');
+        // Robustly determine the correct path for quotation.html
+        // This handles cases where the user might be at /ddp-calculator (no slash)
+        // caused by missing server redirects or caching issues.
+        let currentPath = window.location.pathname;
+
+        // Remove 'index.html' if present
+        if (currentPath.endsWith('index.html')) {
+            currentPath = currentPath.substring(0, currentPath.lastIndexOf('/'));
+        }
+
+        // Ensure trailing slash
+        if (!currentPath.endsWith('/')) {
+            currentPath += '/';
+        }
+
+        // Open quotation.html relative to the computed directory base
+        window.open(`${currentPath}quotation.html`, '_blank');
     };
 
     return (
