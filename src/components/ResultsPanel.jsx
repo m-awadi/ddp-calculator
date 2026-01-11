@@ -32,7 +32,8 @@ const ResultsPanel = ({ results, items, settings, previewResults = null, customs
             ddpPerUnit: item.ddpPerUnit
         }));
         sessionStorage.setItem('quotationItems', JSON.stringify(quotationItems));
-        window.open('/quotation.html', '_blank');
+        // Use relative path to stay within the same directory/route
+        window.open('quotation.html', '_blank');
     };
 
     return (
