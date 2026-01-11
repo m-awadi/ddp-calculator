@@ -17,13 +17,13 @@ export const generatePDFReport = async (results, items, settings, previewResults
     // Header section with gradient-like effect
     doc.setFillColor(44, 62, 80); // Dark navy blue
     doc.rect(0, 0, pageWidth, 65, 'F');
-    
+
     // Main title
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
     doc.text('DDP COST CALCULATION REPORT', pageWidth / 2, 25, { align: 'center' });
-    
+
     // Subtitle
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
@@ -66,13 +66,13 @@ export const generatePDFReport = async (results, items, settings, previewResults
     const summaryData = [
         ['Total Items:', summary.totalItems.toString(), 'Total Volume:', `${formatNumber(summary.totalCbm, 2)} CBM`],
         ['Total Quantity:', `${formatNumber(summary.totalQuantity, 0)} units`, 'Total Weight:', '0.00 kg'],
-        ['Container(s):', summary.containers.join(', '), 'Utilization:', `${formatNumber(summary.containerUtilization, 1)}%`]
+        ['Container(s):', summary.containers.join(', '), 'Utilization:', `${formatNumber(summary.containerUtilization, 2)}%`]
     ];
 
     // Add subtle background for summary data
     doc.setFillColor(248, 249, 250);
     doc.rect(margin, yPos, contentWidth, 24, 'F');
-    
+
     summaryData.forEach(([label1, value1, label2, value2], i) => {
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(108, 117, 125);
@@ -93,7 +93,7 @@ export const generatePDFReport = async (results, items, settings, previewResults
     // Cost summary boxes with shadow effect
     const boxHeight = 22;
     const boxWidth = contentWidth / 2 - 8;
-    
+
     // EXW Cost Box with subtle shadow
     doc.setFillColor(220, 220, 220);
     doc.rect(margin + 2, yPos + 2, boxWidth, boxHeight, 'F'); // Shadow
@@ -102,7 +102,7 @@ export const generatePDFReport = async (results, items, settings, previewResults
     doc.setLineWidth(0.5);
     doc.setDrawColor(206, 212, 218);
     doc.rect(margin, yPos, boxWidth, boxHeight, 'S');
-    
+
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(108, 117, 125);
@@ -118,7 +118,7 @@ export const generatePDFReport = async (results, items, settings, previewResults
     doc.rect(ddpBoxX + 2, yPos + 2, boxWidth, boxHeight, 'F'); // Shadow
     doc.setFillColor(46, 204, 113);
     doc.rect(ddpBoxX, yPos, boxWidth, boxHeight, 'F');
-    
+
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
@@ -133,7 +133,7 @@ export const generatePDFReport = async (results, items, settings, previewResults
     doc.setFontSize(9);
     doc.setTextColor(108, 117, 125);
     doc.setFont('helvetica', 'italic');
-    doc.text(`Cost Increase: ${formatCurrency(costIncrease)} (${formatNumber(increasePercentage, 1)}%)`, ddpBoxX + 8, yPos + 28);
+    doc.text(`Cost Increase: ${formatCurrency(costIncrease)} (${formatNumber(increasePercentage, 2)}%)`, ddpBoxX + 8, yPos + 28);
 
     yPos += 40;
 
@@ -167,13 +167,13 @@ export const generatePDFReport = async (results, items, settings, previewResults
         const breakdown = itemBreakdowns[index] || {};
         const unitPrice = item.unitPrice ?? item.exwPrice ?? 0;
         const total = unitPrice * item.quantity;
-        
+
         return {
             id: (index + 1).toString(),
             item: item.item || item.description || `Item ${index + 1}`,
             qty: item.quantity.toString(),
             unit: 'set',
-            cbm: formatNumber(breakdown.itemCbm || 0, 1),
+            cbm: formatNumber(breakdown.itemCbm || 0, 2),
             fobTotal: formatCurrency(total),
             freight: formatCurrency(breakdown.allocatedFreight || 0),
             clearance: formatCurrency(breakdown.allocatedQatarCharges || 0),
@@ -238,7 +238,7 @@ export const generatePDFReport = async (results, items, settings, previewResults
             ddpUnit: { halign: 'right', cellWidth: 20 },
             ddpUnitQar: { halign: 'right', textColor: [139, 92, 246], cellWidth: 25 }
         },
-        didParseCell: function(data) {
+        didParseCell: function (data) {
             if (data.row.index === tableRows.length - 1) {
                 data.cell.styles.fillColor = [240, 240, 240];
                 data.cell.styles.fontStyle = 'bold';
@@ -263,18 +263,18 @@ export const generatePDFReport = async (results, items, settings, previewResults
     doc.text('CALCULATION SETTINGS', margin + 8, yPos + 7);
 
     yPos += 15;
-    
+
     // Add subtle background for settings
     doc.setFillColor(248, 249, 250);
     doc.rect(margin, yPos, contentWidth, 22, 'F');
-    
+
     doc.setTextColor(52, 58, 64);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
 
     // Calculate actual percentages used in calculations
-    const actualProfitMarginPercent = costs.landedCostBeforeMargin > 0 
-        ? (costs.profitMargin / costs.landedCostBeforeMargin) * 100 
+    const actualProfitMarginPercent = costs.landedCostBeforeMargin > 0
+        ? (costs.profitMargin / costs.landedCostBeforeMargin) * 100
         : 0;
     const actualCommissionPercent = (costs.landedCostBeforeMargin + costs.profitMargin) > 0
         ? (costs.commission / (costs.landedCostBeforeMargin + costs.profitMargin)) * 100
@@ -282,8 +282,8 @@ export const generatePDFReport = async (results, items, settings, previewResults
 
     const settingsData = [
         ['Container Selection:', 'Auto (Optimized)'],
-        ['Profit Margin:', `${formatNumber(actualProfitMarginPercent, 1)}% (${settings.profitMarginMode || 'percentage'})`],
-        ['Commission:', `${formatNumber(actualCommissionPercent, 1)}% (${settings.commissionMode || 'percentage'})`]
+        ['Profit Margin:', `${formatNumber(actualProfitMarginPercent, 2)}% (${settings.profitMarginMode || 'percentage'})`],
+        ['Commission:', `${formatNumber(actualCommissionPercent, 2)}% (${settings.commissionMode || 'percentage'})`]
     ];
 
     settingsData.forEach(([label, value], i) => {
@@ -377,34 +377,42 @@ export const generatePDFReport = async (results, items, settings, previewResults
     // Single source of truth for Qatar charge line items
     const qatarChargeItems = [
         // Government & Customs section
-        { section: 'Government & Customs', items: [
-            ['Customs Duty (5%)', costs.qatarCharges.customsDuty],
-            ['Mwani Charges', costs.qatarCharges.mwaniCharges]
-        ]},
-        
+        {
+            section: 'Government & Customs', items: [
+                ['Customs Duty (5%)', costs.qatarCharges.customsDuty],
+                ['Mwani Charges', costs.qatarCharges.mwaniCharges]
+            ]
+        },
+
         // CMA CGM Shipping Line section  
-        { section: 'CMA CGM Shipping Line Fees', items: [
-            ['Delivery Order', costs.qatarCharges.deliveryOrderFees],
-            ['Terminal Handling (THC)', costs.qatarCharges.terminalHandling],
-            ['Container Return', costs.qatarCharges.containerReturn],
-            ['Container Maintenance', costs.qatarCharges.containerMaintenance],
-            ['Terminal Inspection', costs.qatarCharges.terminalInspection],
-            ['Inspection Charge', costs.qatarCharges.inspectionCharge]
-        ]},
-        
+        {
+            section: 'CMA CGM Shipping Line Fees', items: [
+                ['Delivery Order', costs.qatarCharges.deliveryOrderFees],
+                ['Terminal Handling (THC)', costs.qatarCharges.terminalHandling],
+                ['Container Return', costs.qatarCharges.containerReturn],
+                ['Container Maintenance', costs.qatarCharges.containerMaintenance],
+                ['Terminal Inspection', costs.qatarCharges.terminalInspection],
+                ['Inspection Charge', costs.qatarCharges.inspectionCharge]
+            ]
+        },
+
         // MOFA Attestation section
-        { section: 'MOFA Attestation (Tiered)', items: [
-            ['Commercial Invoice', costs.qatarCharges.documentAttestation - 150],
-            ['Certificate of Origin', 150]
-        ]},
-        
+        {
+            section: 'MOFA Attestation (Tiered)', items: [
+                ['Commercial Invoice', costs.qatarCharges.documentAttestation - 150],
+                ['Certificate of Origin', 150]
+            ]
+        },
+
         // Clearance & Delivery section (single canonical clearance charge)
-        { section: 'Clearance & Delivery', items: [
-            ['Clearance Charges', costs.qatarCharges.clearanceCharges],
-            ['Local Transport', costs.qatarCharges.localTransport]
-        ]}
+        {
+            section: 'Clearance & Delivery', items: [
+                ['Clearance Charges', costs.qatarCharges.clearanceCharges],
+                ['Local Transport', costs.qatarCharges.localTransport]
+            ]
+        }
     ];
-    
+
     // Validate and render sections
     let calculatedTotal = 0;
     qatarChargeItems.forEach(({ section, items }) => {
@@ -414,7 +422,7 @@ export const generatePDFReport = async (results, items, settings, previewResults
         doc.setTextColor(108, 117, 125);
         doc.text(`${section}:`, margin + 15, yPos);
         yPos += 8;
-        
+
         // Section items
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(52, 58, 64);
@@ -424,17 +432,17 @@ export const generatePDFReport = async (results, items, settings, previewResults
                 throw new Error(`Invalid Qatar charge item: ${label} = ${value}`);
             }
             calculatedTotal += value;
-            
+
             doc.text(label, margin + 25, yPos);
             doc.setFont('helvetica', 'bold');
             doc.text(`QAR ${formatNumber(value, 2)}`, margin + contentWidth - 15, yPos, { align: 'right' });
             doc.setFont('helvetica', 'normal');
             yPos += section === 'MOFA Attestation (Tiered)' ? 6 : 7;
         });
-        
+
         yPos += 5;
     });
-    
+
     // Validation: ensure displayed total matches calculated total
     if (Math.abs(calculatedTotal - costs.totalQatarChargesQar) > 0.01) {
         throw new Error(`Qatar charges mismatch: displayed=${calculatedTotal}, calculated=${costs.totalQatarChargesQar}`);
@@ -487,20 +495,20 @@ export const generatePDFReport = async (results, items, settings, previewResults
 
     // Total DDP Price with professional highlight and shadow
     const totalBoxHeight = 18;
-    
+
     // Shadow effect
     doc.setFillColor(200, 230, 201);
     doc.rect(margin + 2, yPos + 2, contentWidth, totalBoxHeight, 'F');
-    
+
     // Main box
     doc.setFillColor(46, 204, 113);
     doc.rect(margin, yPos, contentWidth, totalBoxHeight, 'F');
-    
+
     // Border
     doc.setLineWidth(1);
     doc.setDrawColor(39, 174, 96);
     doc.rect(margin, yPos, contentWidth, totalBoxHeight, 'S');
-    
+
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');

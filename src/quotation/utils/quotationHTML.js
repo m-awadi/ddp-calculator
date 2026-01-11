@@ -11,10 +11,6 @@ export const generateQuotationHTML = (data) => {
         totalQAR,
         totalUSD,
         companyInfo,
-        deliveryTerms,
-        timelineTerms,
-        paymentTerms,
-        bankDetails,
         showPictureColumn = true,
         customBlocks = [],
         quantityUnit = 'pcs'
@@ -197,6 +193,7 @@ export const generateQuotationHTML = (data) => {
             line-height: 1.8;
         }
 
+        /* Bank details now handled by custom blocks, but keeping class just in case users add it manually or for legacy support */
         .bank-details {
             direction: ltr;
             text-align: left;
@@ -281,52 +278,18 @@ export const generateQuotationHTML = (data) => {
             </tbody>
         </table>
 
-        <!-- Custom Blocks (After Table) -->
+        <!-- Custom Blocks (Now includes Terms & Bank Details) -->
         ${customBlocks.map(block => `
             <div class="terms-section" style="margin-top: 30px;">
                 <div class="terms-title">${block.title}</div>
                 ${block.sections.map(section => `
                     <div style="margin-top: 15px;">
-                        <strong>● ${section.title}:</strong>
+                        <strong>● ${section.title}</strong>
                         ${section.items.map(item => `<div class="term-item">○ ${item}</div>`).join('')}
                     </div>
                 `).join('')}
             </div>
         `).join('')}
-
-        <!-- Fixed Terms - Right below custom blocks -->
-        <div class="terms-section" style="margin-top: 20px;">
-            <div class="terms-title">معلومات خاصة بالعرض:</div>
-
-            <div style="margin-top: 15px;">
-                <strong>● التسليم:</strong>
-                ${deliveryTerms.map(term => `<div class="term-item">○ ${term}</div>`).join('')}
-            </div>
-
-            <div style="margin-top: 15px;">
-                <strong>● المدة الزمنية:</strong>
-                ${timelineTerms.map(term => `<div class="term-item">○ ${term}</div>`).join('')}
-            </div>
-
-            <div style="margin-top: 15px;">
-                <strong>● الدفع:</strong>
-                ${paymentTerms.map(term => `<div class="term-item">○ ${term}</div>`).join('')}
-            </div>
-
-            <div style="margin-top: 15px;">
-                <strong>● التحويلات:</strong>
-                <div class="term-item">يتم التحويل على الحساب البنكي الخاص بالشركة بالتفاصيل التالية:</div>
-            </div>
-        </div>
-
-        <div class="bank-details">
-            <p><strong>Account name:</strong> ${bankDetails.accountName}</p>
-            <p><strong>Account number/IBAN:</strong> ${bankDetails.accountNumber}</p>
-            <p><strong>Bank name:</strong> ${bankDetails.bankName}</p>
-            <p><strong>Bank SWIFT/BIC:</strong> ${bankDetails.swiftBic}</p>
-            <p><strong>Bank address:</strong> ${bankDetails.bankAddress}</p>
-            <p><strong>Bank country:</strong> ${bankDetails.bankCountry}</p>
-        </div>
 
         <!-- Footer - appears only on final page -->
         <img src="/footer.png" alt="Footer" class="footer-bar">

@@ -17,28 +17,55 @@ export const DEFAULT_COMPANY_INFO = {
     email: 'info@arabiantraderoute.com'
 };
 
-export const DEFAULT_DELIVERY_TERMS = [
-    'التسليم يشمل جميع الرسوم الجمركية والشحن حتى الباب (DDP)',
-    'Delivery includes all customs duties and shipping to door (DDP)'
+export const DEFAULT_CUSTOM_BLOCKS = [
+    {
+        id: 'terms-block',
+        title: 'معلومات خاصة بالعرض:',
+        sections: [
+            {
+                id: 'delivery-section',
+                title: 'التسليم:',
+                items: [
+                    'التسليم يشمل جميع الرسوم الجمركية والشحن حتى الباب (DDP)',
+                    'Delivery includes all customs duties and shipping to door (DDP)'
+                ]
+            },
+            {
+                id: 'timeline-section',
+                title: 'المدة الزمنية:',
+                items: [
+                    'مدة التوريد: 30-45 يوم عمل من تاريخ تأكيد الطلب',
+                    'Supply time: 30-45 working days from order confirmation'
+                ]
+            },
+            {
+                id: 'payment-section',
+                title: 'الدفع:',
+                items: [
+                    'دفعة مقدمة: 30% عند تأكيد الطلب',
+                    'الرصيد: 70% عند الشحن',
+                    'Down payment: 30% upon order confirmation',
+                    'Balance: 70% upon shipment'
+                ]
+            }
+        ]
+    },
+    {
+        id: 'bank-block',
+        title: 'التحويلات:',
+        sections: [
+            {
+                id: 'bank-section',
+                title: 'يتم التحويل على الحساب البنكي الخاص بالشركة بالتفاصيل التالية:',
+                items: [
+                    'Account name: Arabian Trade Route',
+                    'Account number/IBAN: QA00XXXX0000000000000000',
+                    'Bank name: Qatar National Bank',
+                    'Bank SWIFT/BIC: QNBAQAQA',
+                    'Bank address: Doha, Qatar',
+                    'Bank country: Qatar'
+                ]
+            }
+        ]
+    }
 ];
-
-export const DEFAULT_TIMELINE_TERMS = [
-    'مدة التوريد: 30-45 يوم عمل من تاريخ تأكيد الطلب',
-    'Supply time: 30-45 working days from order confirmation'
-];
-
-export const DEFAULT_PAYMENT_TERMS = [
-    'دفعة مقدمة: 30% عند تأكيد الطلب',
-    'الرصيد: 70% عند الشحن',
-    'Down payment: 30% upon order confirmation',
-    'Balance: 70% upon shipment'
-];
-
-export const DEFAULT_BANK_DETAILS = {
-    accountName: 'Arabian Trade Route',
-    accountNumber: 'QA00XXXX0000000000000000',
-    bankName: 'Qatar National Bank',
-    swiftBic: 'QNBAQAQA',
-    bankAddress: 'Doha, Qatar',
-    bankCountry: 'Qatar'
-};

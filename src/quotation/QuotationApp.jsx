@@ -4,10 +4,7 @@ import { generateQuotationPDF } from './utils/quotationPDF';
 import { generateQuotationHTML } from './utils/quotationHTML';
 import {
     DEFAULT_COMPANY_INFO,
-    DEFAULT_DELIVERY_TERMS,
-    DEFAULT_TIMELINE_TERMS,
-    DEFAULT_PAYMENT_TERMS,
-    DEFAULT_BANK_DETAILS,
+    DEFAULT_CUSTOM_BLOCKS,
     QUOTATION_COLORS
 } from './utils/defaultTerms';
 
@@ -20,20 +17,27 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
             ? initialItems.map(item => ({
                 description: item.description || '',
                 quantity: item.quantity || 0,
-                price: item.ddpPerUnit || 0,
+                price: item.ddpPerUnit ? parseFloat(item.ddpPerUnit.toFixed(2)) : 0,
                 image: null
             }))
             : [{ description: '', quantity: 0, price: 0, image: null }]
     );
 
     const [companyInfo, setCompanyInfo] = useState({ ...DEFAULT_COMPANY_INFO });
-    const [deliveryTerms, setDeliveryTerms] = useState([...DEFAULT_DELIVERY_TERMS]);
-    const [timelineTerms, setTimelineTerms] = useState([...DEFAULT_TIMELINE_TERMS]);
-    const [paymentTerms, setPaymentTerms] = useState([...DEFAULT_PAYMENT_TERMS]);
-    const [bankDetails, setBankDetails] = useState({ ...DEFAULT_BANK_DETAILS });
 
-    // Custom blocks - flexible sections that can be added after the table
-    const [customBlocks, setCustomBlocks] = useState([]);
+    // Custom blocks - flexible sections initialized with default terms
+    const [customBlocks, setCustomBlocks] = useState(() => {
+        // Ensure all blocks and sections have IDs for reliable reordering
+        const blocks = JSON.parse(JSON.stringify(DEFAULT_CUSTOM_BLOCKS));
+        return blocks.map((block, i) => ({
+            ...block,
+            id: block.id || `block-${Date.now()}-${i}`,
+            sections: block.sections.map((section, j) => ({
+                ...section,
+                id: section.id || `section-${Date.now()}-${i}-${j}`
+            }))
+        }));
+    });
 
     const updateItem = (index, field, value) => {
         const newItems = [...items];
@@ -48,42 +52,6 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
     const removeItem = (index) => {
         if (items.length > 1) {
             setItems(items.filter((_, i) => i !== index));
-        }
-    };
-
-    const addTerm = (section) => {
-        if (section === 'delivery') setDeliveryTerms([...deliveryTerms, '']);
-        if (section === 'timeline') setTimelineTerms([...timelineTerms, '']);
-        if (section === 'payment') setPaymentTerms([...paymentTerms, '']);
-    };
-
-    const updateTerm = (section, index, value) => {
-        if (section === 'delivery') {
-            const newTerms = [...deliveryTerms];
-            newTerms[index] = value;
-            setDeliveryTerms(newTerms);
-        }
-        if (section === 'timeline') {
-            const newTerms = [...timelineTerms];
-            newTerms[index] = value;
-            setTimelineTerms(newTerms);
-        }
-        if (section === 'payment') {
-            const newTerms = [...paymentTerms];
-            newTerms[index] = value;
-            setPaymentTerms(newTerms);
-        }
-    };
-
-    const removeTerm = (section, index) => {
-        if (section === 'delivery' && deliveryTerms.length > 1) {
-            setDeliveryTerms(deliveryTerms.filter((_, i) => i !== index));
-        }
-        if (section === 'timeline' && timelineTerms.length > 1) {
-            setTimelineTerms(timelineTerms.filter((_, i) => i !== index));
-        }
-        if (section === 'payment' && paymentTerms.length > 1) {
-            setPaymentTerms(paymentTerms.filter((_, i) => i !== index));
         }
     };
 
@@ -149,6 +117,50 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
         setCustomBlocks(newBlocks);
     };
 
+    const moveCustomBlock = (index, direction) => {
+        if ((direction === 'up' && index === 0) ||
+            (direction === 'down' && index === customBlocks.length - 1)) return;
+
+        const newBlocks = [...customBlocks];
+        const targetIndex = direction === 'up' ? index - 1 : index + 1;
+        [newBlocks[index], newBlocks[targetIndex]] = [newBlocks[targetIndex], newBlocks[index]];
+        setCustomBlocks(newBlocks);
+    };
+
+    const moveSection = (blockIndex, sectionIndex, direction) => {
+        const newBlocks = [...customBlocks];
+        // Shallow copy block and sections to avoid direct mutation
+        newBlocks[blockIndex] = { ...newBlocks[blockIndex], sections: [...newBlocks[blockIndex].sections] };
+
+        const sections = newBlocks[blockIndex].sections;
+        if ((direction === 'up' && sectionIndex === 0) ||
+            (direction === 'down' && sectionIndex === sections.length - 1)) return;
+
+        const targetIndex = direction === 'up' ? sectionIndex - 1 : sectionIndex + 1;
+        [sections[sectionIndex], sections[targetIndex]] = [sections[targetIndex], sections[sectionIndex]];
+        setCustomBlocks(newBlocks);
+    };
+
+    const moveBlockItem = (blockIndex, sectionIndex, itemIndex, direction) => {
+        const newBlocks = [...customBlocks];
+        // Deep copy nested structure
+        newBlocks[blockIndex] = { ...newBlocks[blockIndex] };
+        newBlocks[blockIndex].sections = [...newBlocks[blockIndex].sections];
+        newBlocks[blockIndex].sections[sectionIndex] = {
+            ...newBlocks[blockIndex].sections[sectionIndex],
+            items: [...newBlocks[blockIndex].sections[sectionIndex].items]
+        };
+
+        const items = newBlocks[blockIndex].sections[sectionIndex].items;
+        if ((direction === 'up' && itemIndex === 0) ||
+            (direction === 'down' && itemIndex === items.length - 1)) return;
+
+        const targetIndex = direction === 'up' ? itemIndex - 1 : itemIndex + 1;
+        [items[itemIndex], items[targetIndex]] = [items[targetIndex], items[itemIndex]];
+        setCustomBlocks(newBlocks);
+
+    };
+
     const handleGeneratePDF = async () => {
         try {
             await generateQuotationPDF({
@@ -157,10 +169,6 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                 totalQAR,
                 totalUSD,
                 companyInfo,
-                deliveryTerms,
-                timelineTerms,
-                paymentTerms,
-                bankDetails,
                 showPictureColumn,
                 customBlocks,
                 quantityUnit
@@ -179,10 +187,6 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                 totalQAR,
                 totalUSD,
                 companyInfo,
-                deliveryTerms,
-                timelineTerms,
-                paymentTerms,
-                bankDetails,
                 showPictureColumn,
                 customBlocks,
                 quantityUnit
@@ -425,11 +429,11 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                         </button>
                     </div>
 
-                    {/* Custom Blocks - Flexible sections after table */}
+                    {/* Custom Blocks (Now including Terms & Bank Details) */}
                     <div style={{ marginBottom: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                             <h3 style={{ fontSize: '16px', fontWeight: '600', margin: 0, color: QUOTATION_COLORS.textDark }}>
-                                Custom Sections (After Table)
+                                Terms & Conditions / Custom Sections
                             </h3>
                             <button
                                 onClick={addCustomBlock}
@@ -474,6 +478,40 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                         }}
                                     />
                                     <button
+                                        onClick={() => moveCustomBlock(blockIdx, 'up')}
+                                        disabled={blockIdx === 0}
+                                        title="Move Block Up"
+                                        style={{
+                                            padding: '8px 12px',
+                                            background: 'transparent',
+                                            border: '1px solid #9CA3AF40',
+                                            borderRadius: '6px',
+                                            color: '#4B5563',
+                                            cursor: blockIdx === 0 ? 'default' : 'pointer',
+                                            fontSize: '14px',
+                                            opacity: blockIdx === 0 ? 0.3 : 1
+                                        }}
+                                    >
+                                        ↑
+                                    </button>
+                                    <button
+                                        onClick={() => moveCustomBlock(blockIdx, 'down')}
+                                        disabled={blockIdx === customBlocks.length - 1}
+                                        title="Move Block Down"
+                                        style={{
+                                            padding: '8px 12px',
+                                            background: 'transparent',
+                                            border: '1px solid #9CA3AF40',
+                                            borderRadius: '6px',
+                                            color: '#4B5563',
+                                            cursor: blockIdx === customBlocks.length - 1 ? 'default' : 'pointer',
+                                            fontSize: '14px',
+                                            opacity: blockIdx === customBlocks.length - 1 ? 0.3 : 1
+                                        }}
+                                    >
+                                        ↓
+                                    </button>
+                                    <button
                                         onClick={() => removeCustomBlock(blockIdx)}
                                         style={{
                                             padding: '8px 12px',
@@ -517,6 +555,40 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                                 }}
                                             />
                                             <button
+                                                onClick={() => moveSection(blockIdx, sectionIdx, 'up')}
+                                                disabled={sectionIdx === 0}
+                                                title="Move Section Up"
+                                                style={{
+                                                    padding: '6px 10px',
+                                                    background: 'transparent',
+                                                    border: '1px solid #9CA3AF40',
+                                                    borderRadius: '6px',
+                                                    color: '#4B5563',
+                                                    cursor: sectionIdx === 0 ? 'default' : 'pointer',
+                                                    fontSize: '12px',
+                                                    opacity: sectionIdx === 0 ? 0.3 : 1
+                                                }}
+                                            >
+                                                ↑
+                                            </button>
+                                            <button
+                                                onClick={() => moveSection(blockIdx, sectionIdx, 'down')}
+                                                disabled={sectionIdx === block.sections.length - 1}
+                                                title="Move Section Down"
+                                                style={{
+                                                    padding: '6px 10px',
+                                                    background: 'transparent',
+                                                    border: '1px solid #9CA3AF40',
+                                                    borderRadius: '6px',
+                                                    color: '#4B5563',
+                                                    cursor: sectionIdx === block.sections.length - 1 ? 'default' : 'pointer',
+                                                    fontSize: '12px',
+                                                    opacity: sectionIdx === block.sections.length - 1 ? 0.3 : 1
+                                                }}
+                                            >
+                                                ↓
+                                            </button>
+                                            <button
                                                 onClick={() => removeSection(blockIdx, sectionIdx)}
                                                 style={{
                                                     padding: '6px 10px',
@@ -551,6 +623,40 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                                         resize: 'vertical'
                                                     }}
                                                 />
+                                                <button
+                                                    onClick={() => moveBlockItem(blockIdx, sectionIdx, itemIdx, 'up')}
+                                                    disabled={itemIdx === 0}
+                                                    title="Move Item Up"
+                                                    style={{
+                                                        padding: '2px 6px',
+                                                        background: 'transparent',
+                                                        border: '1px solid #9CA3AF40',
+                                                        borderRadius: '4px',
+                                                        color: '#4B5563',
+                                                        cursor: itemIdx === 0 ? 'default' : 'pointer',
+                                                        fontSize: '11px',
+                                                        opacity: itemIdx === 0 ? 0.3 : 1
+                                                    }}
+                                                >
+                                                    ↑
+                                                </button>
+                                                <button
+                                                    onClick={() => moveBlockItem(blockIdx, sectionIdx, itemIdx, 'down')}
+                                                    disabled={itemIdx === section.items.length - 1}
+                                                    title="Move Item Down"
+                                                    style={{
+                                                        padding: '2px 6px',
+                                                        background: 'transparent',
+                                                        border: '1px solid #9CA3AF40',
+                                                        borderRadius: '4px',
+                                                        color: '#4B5563',
+                                                        cursor: itemIdx === section.items.length - 1 ? 'default' : 'pointer',
+                                                        fontSize: '11px',
+                                                        opacity: itemIdx === section.items.length - 1 ? 0.3 : 1
+                                                    }}
+                                                >
+                                                    ↓
+                                                </button>
                                                 <button
                                                     onClick={() => removeBlockItem(blockIdx, sectionIdx, itemIdx)}
                                                     style={{
@@ -606,183 +712,7 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                             </div>
                         ))}
                     </div>
-
-                    {/* Terms Sections - Fixed blocks right below dynamic blocks */}
-                    <div style={{ marginBottom: '24px' }}>
-                        <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: QUOTATION_COLORS.textDark }}>
-                            Fixed Terms & Bank Details
-                        </h3>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                        {/* Delivery Terms */}
-                        <TermsSection
-                            title="التسليم (Delivery)"
-                            terms={deliveryTerms}
-                            onUpdate={(index, value) => updateTerm('delivery', index, value)}
-                            onAdd={() => addTerm('delivery')}
-                            onRemove={(index) => removeTerm('delivery', index)}
-                        />
-
-                        {/* Timeline Terms */}
-                        <TermsSection
-                            title="المدة الزمنية (Timeline)"
-                            terms={timelineTerms}
-                            onUpdate={(index, value) => updateTerm('timeline', index, value)}
-                            onAdd={() => addTerm('timeline')}
-                            onRemove={(index) => removeTerm('timeline', index)}
-                        />
-
-                        {/* Payment Terms */}
-                        <TermsSection
-                            title="الدفع (Payment)"
-                            terms={paymentTerms}
-                            onUpdate={(index, value) => updateTerm('payment', index, value)}
-                            onAdd={() => addTerm('payment')}
-                            onRemove={(index) => removeTerm('payment', index)}
-                        />
-
-                        {/* Bank Details */}
-                        <div>
-                            <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: QUOTATION_COLORS.textDark }}>
-                                التحويلات (Bank Transfers)
-                            </h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <input
-                                    type="text"
-                                    value={bankDetails.accountName}
-                                    onChange={(e) => setBankDetails({ ...bankDetails, accountName: e.target.value })}
-                                    placeholder="Account Name"
-                                    style={{
-                                        padding: '8px',
-                                        border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
-                                        borderRadius: '6px',
-                                        fontSize: '13px'
-                                    }}
-                                />
-                                <input
-                                    type="text"
-                                    value={bankDetails.accountNumber}
-                                    onChange={(e) => setBankDetails({ ...bankDetails, accountNumber: e.target.value })}
-                                    placeholder="Account Number/IBAN"
-                                    style={{
-                                        padding: '8px',
-                                        border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
-                                        borderRadius: '6px',
-                                        fontSize: '13px'
-                                    }}
-                                />
-                                <input
-                                    type="text"
-                                    value={bankDetails.bankName}
-                                    onChange={(e) => setBankDetails({ ...bankDetails, bankName: e.target.value })}
-                                    placeholder="Bank Name"
-                                    style={{
-                                        padding: '8px',
-                                        border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
-                                        borderRadius: '6px',
-                                        fontSize: '13px'
-                                    }}
-                                />
-                                <input
-                                    type="text"
-                                    value={bankDetails.swiftBic}
-                                    onChange={(e) => setBankDetails({ ...bankDetails, swiftBic: e.target.value })}
-                                    placeholder="SWIFT/BIC"
-                                    style={{
-                                        padding: '8px',
-                                        border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
-                                        borderRadius: '6px',
-                                        fontSize: '13px'
-                                    }}
-                                />
-                                <input
-                                    type="text"
-                                    value={bankDetails.bankAddress}
-                                    onChange={(e) => setBankDetails({ ...bankDetails, bankAddress: e.target.value })}
-                                    placeholder="Bank Address"
-                                    style={{
-                                        padding: '8px',
-                                        border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
-                                        borderRadius: '6px',
-                                        fontSize: '13px'
-                                    }}
-                                />
-                                <input
-                                    type="text"
-                                    value={bankDetails.bankCountry}
-                                    onChange={(e) => setBankDetails({ ...bankDetails, bankCountry: e.target.value })}
-                                    placeholder="Bank Country"
-                                    style={{
-                                        padding: '8px',
-                                        border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
-                                        borderRadius: '6px',
-                                        fontSize: '13px'
-                                    }}
-                                />
-                            </div>
-                        </div>
-                        </div>
-                    </div>
                 </div>
-            </div>
-        </div>
-    );
-};
-
-const TermsSection = ({ title, terms, onUpdate, onAdd, onRemove }) => {
-    return (
-        <div>
-            <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: QUOTATION_COLORS.textDark }}>
-                {title}
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {terms.map((term, index) => (
-                    <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <textarea
-                            value={term}
-                            onChange={(e) => onUpdate(index, e.target.value)}
-                            placeholder="Enter term..."
-                            rows="2"
-                            style={{
-                                flex: 1,
-                                padding: '8px',
-                                border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
-                                borderRadius: '6px',
-                                fontSize: '13px',
-                                fontFamily: 'inherit',
-                                resize: 'vertical'
-                            }}
-                        />
-                        <button
-                            onClick={() => onRemove(index)}
-                            style={{
-                                padding: '6px 10px',
-                                background: '#EF444420',
-                                border: '1px solid #EF444440',
-                                borderRadius: '6px',
-                                color: '#EF4444',
-                                cursor: 'pointer',
-                                fontSize: '14px'
-                            }}
-                        >
-                            ✕
-                        </button>
-                    </div>
-                ))}
-                <button
-                    onClick={onAdd}
-                    style={{
-                        padding: '8px 16px',
-                        background: `${QUOTATION_COLORS.primary}20`,
-                        color: QUOTATION_COLORS.primary,
-                        border: `1px dashed ${QUOTATION_COLORS.primary}`,
-                        borderRadius: '6px',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        cursor: 'pointer'
-                    }}
-                >
-                    + Add Term
-                </button>
             </div>
         </div>
     );

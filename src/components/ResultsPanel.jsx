@@ -76,7 +76,7 @@ const ResultsPanel = ({ results, items, settings, previewResults = null, customs
                     <div>
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Utilization</p>
                         <p style={{ fontSize: '20px', fontWeight: '700', color: summary.containerUtilization > 80 ? 'var(--accent-emerald)' : 'var(--accent-amber)' }}>
-                            {formatNumber(summary.containerUtilization, 1)}%
+                            {formatNumber(summary.containerUtilization, 2)}%
                         </p>
                     </div>
                 </div>

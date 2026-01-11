@@ -7,6 +7,7 @@ import Card from './components/Card';
 import Input from './components/Input';
 import ItemRow from './components/ItemRow';
 import ResultsPanel from './components/ResultsPanel';
+import SmartImportModal from './components/SmartImportModal';
 
 function App() {
     // Refs
@@ -125,6 +126,16 @@ function App() {
         }
     };
 
+    const [isSmartImportOpen, setIsSmartImportOpen] = useState(false);
+
+    const handleSmartImportData = (data) => {
+        if (data.items) setItems(data.items);
+        if (data.settings) setSettings(data.settings);
+        if (data.overrides) setOverrides(data.overrides);
+        if (data.customsPreview) setCustomsPreview(data.customsPreview);
+        if (data.reportName) setReportName(data.reportName);
+    };
+
     const triggerImport = () => {
         fileInputRef.current?.click();
     };
@@ -140,10 +151,19 @@ function App() {
                     marginBottom: '2rem',
                     textAlign: 'center',
                     boxShadow: '0 20px 60px rgba(59, 130, 246, 0.3)',
-                    position: 'relative',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
                 }}>
                     {/* Import/Export Buttons */}
-                    <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', display: 'flex', gap: '8px' }}>
+                    <div style={{
+                        width: '100%',
+                        display: 'flex',
+                        justifyContent: 'flex-end',
+                        gap: '8px',
+                        marginBottom: '1.5rem',
+                        flexWrap: 'wrap'
+                    }}>
                         <button
                             onClick={() => downloadTemplate()}
                             style={{
@@ -211,6 +231,28 @@ function App() {
                             <span>↑</span>
                             <span>Import</span>
                         </button>
+                        <button
+                            onClick={() => setIsSmartImportOpen(true)}
+                            style={{
+                                padding: '8px 16px',
+                                background: 'rgba(139, 92, 246, 0.3)', // Purple tint for AI
+                                border: '1px solid rgba(139, 92, 246, 0.4)',
+                                borderRadius: '8px',
+                                color: 'white',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                transition: '0.2s',
+                            }}
+                            onMouseEnter={e => e.target.style.background = 'rgba(139, 92, 246, 0.4)'}
+                            onMouseLeave={e => e.target.style.background = 'rgba(139, 92, 246, 0.3)'}
+                        >
+                            <span>✨</span>
+                            <span>Smart Import</span>
+                        </button>
                         <input
                             ref={fileInputRef}
                             type="file"
@@ -230,6 +272,12 @@ function App() {
                         1 USD = {DEFAULT_RATES.usdToQar} QAR
                     </div>
                 </div>
+
+                <SmartImportModal
+                    isOpen={isSmartImportOpen}
+                    onClose={() => setIsSmartImportOpen(false)}
+                    onImport={handleSmartImportData}
+                />
 
                 <div style={{ display: 'grid', gap: '2rem' }}>
                     {/* Items Section */}
