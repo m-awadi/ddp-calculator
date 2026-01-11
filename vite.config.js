@@ -4,6 +4,7 @@ import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [react()],
+  base: './', // Use relative paths for assets to work under any path prefix
   server: {
     port: 8080,
     open: true
