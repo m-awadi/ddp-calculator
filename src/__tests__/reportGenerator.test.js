@@ -62,7 +62,7 @@ describe('reportGenerator', () => {
                 freightSubtotal: 3357.5,
                 insurance: 24.29,
                 cifValue: 4857.5,
-                cifWithInsurance: 4881.79,
+                cifValue: 4881.79,
                 cifValueQar: 17818.53,
                 qatarCharges: {
                     customsDuty: 891.93,

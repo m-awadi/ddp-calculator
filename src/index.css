@@ -1,13 +1,15 @@
 :root {
-  --bg-primary: #0a0f1a;
-  --bg-secondary: #111827;
-  --bg-card: #1a2234;
-  --border: #2a3548;
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --accent-blue: #3b82f6;
-  --accent-cyan: #06b6d4;
-  --accent-emerald: #10b981;
+  --bg-primary: #FFFDF7;    /* Background White */
+  --bg-secondary: #F5F5F5;  /* Light Gray */
+  --bg-card: #EADCC2;       /* Desert Sand */
+  --border: #6A7B8C;        /* Cool Gray */
+  --text-primary: #1B2B38;  /* Navy Blue */
+  --text-secondary: #6A7B8C; /* Cool Gray */
+  --text-muted: #6A7B8C;    /* Cool Gray */
+  --accent-blue: #D65A1F;   /* Burnt Orange (primary) */
+  --accent-cyan: #EC722D;   /* Light Burnt Orange */
+  --accent-emerald: #D65A1F; /* Burnt Orange */
+  --accent-purple: #D65A1F; /* Burnt Orange */
 }
 
 * {

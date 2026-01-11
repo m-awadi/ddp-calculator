@@ -25,9 +25,24 @@ export const calculateMofaFee = (invoiceValueQar) => {
  */
 export const selectContainers = (totalCbm) => {
     const containers = [];
-    let remainingCbm = totalCbm;
 
-    // Try to fit into full containers
+    // Very small shipments use LCL
+    if (totalCbm <= 15) {
+        return ['LCL'];
+    }
+
+    // Single-container shortcuts to avoid unnecessary LCL splits
+    if (totalCbm <= CONTAINER_SPECS['20GP'].cbm) {
+        return ['20GP'];
+    }
+    // If just above 20GP but still well within 40GP, prefer a single 40GP
+    const fortyGpMax = CONTAINER_SPECS['40GP'].cbm;
+    if (totalCbm <= fortyGpMax && totalCbm <= CONTAINER_SPECS['20GP'].cbm * 1.2) {
+        return ['40GP'];
+    }
+
+    // Fallback to greedy packing for larger volumes
+    let remainingCbm = totalCbm;
     while (remainingCbm > 0) {
         if (remainingCbm >= CONTAINER_SPECS['40HC'].cbm) {
             containers.push('40HC');
@@ -107,47 +122,77 @@ export const calculateQatarFees = (containers, cifValueQar, invoiceValueQar, rat
     // Calculate MOFA attestation fees
     const mofaAttestation = calculateMofaFee(invoiceValueQar);
 
-    return {
+    // Build Qatar charges with single canonical clearance charge
+    const qatarCharges = {
+        // Government & Customs charges
         customsDuty,
         mwaniCharges: rates.qatarClearance.mwaniCharges,
+        
+        // CMA CGM Shipping Line charges
         deliveryOrderFees,
         terminalHandling,
         containerReturn,
         containerMaintenance,
         terminalInspection: rates.qatarClearance.terminalInspection,
         inspectionCharge: rates.qatarClearance.inspectionCharge,
-        clearanceAgentFees: rates.qatarClearance.clearanceAgentFees,
+        
+        // MOFA attestation
         documentAttestation: mofaAttestation,
+        
+        // Single canonical clearance charge (no duplicates)
+        clearanceCharges: rates.qatarClearance.clearanceAgentFees,
+        
+        // Local transport
         localTransport: rates.localTransport,
     };
+    
+    // Validation: ensure no NaN or invalid values
+    Object.entries(qatarCharges).forEach(([key, value]) => {
+        if (typeof value !== 'number' || isNaN(value) || value < 0) {
+            throw new Error(`Invalid Qatar charge: ${key} = ${value}`);
+        }
+    });
+    
+    return qatarCharges;
 };
 
-/**
- * Main DDP calculation function
- * @param {Array} items - Array of item objects
- * @param {object} settings - Settings object (containerType, profitMargin, etc.)
- * @param {object} overrides - Rate overrides
- * @returns {object|null} Complete DDP calculation results
- */
-export const calculateDDP = (items, settings, overrides = {}) => {
-    if (!items.length) return null;
+// Memoization cache to prevent re-render loops
+let lastInput = null;
+let lastResult = null;
+
+// Simple deep comparison function for memoization
+const deepCompare = (obj1, obj2) => {
+    try {
+        return JSON.stringify(obj1) === JSON.stringify(obj2);
+    } catch (e) {
+        console.error("Deep compare failed:", e);
+        return false;
+    }
+};
+
+const performDDPCalculation = (inputItems, settings, overrides) => {
+    if (!inputItems.length) return null;
+
+    // Use a deep copy of items to prevent state mutation, which is a common cause of loops
+    const items = JSON.parse(JSON.stringify(inputItems));
 
     const rates = { ...DEFAULT_RATES, ...overrides };
+    const profitMarginSetting = settings.profitMargin ?? DEFAULT_RATES.profitMargin;
+    const commissionRateSetting = settings.commissionRate ?? DEFAULT_RATES.commissionRate;
 
-    // Calculate totals
+    // Calculate totals using reduce for reliability
+    const totalExwCost = items.reduce((sum, item) => {
+        const unitPrice = item.unitPrice ?? item.exwPrice ?? 0;
+        return sum + (unitPrice * item.quantity);
+    }, 0);
+
     let totalCbm = 0;
     let totalWeight = 0;
-    let totalExwCost = 0;
     let totalCertificationCost = 0;
 
     items.forEach(item => {
-        const itemCbm = item.cbmPerUnit * item.quantity;
-        const itemWeight = (item.weightPerUnit || 0) * item.quantity;
-        totalCbm += itemCbm;
-        totalWeight += itemWeight;
-        totalExwCost += item.unitPrice * item.quantity;
-
-        // Add certification costs for this item
+        totalCbm += (item.cbmPerUnit || 0) * item.quantity;
+        totalWeight += (item.weightPerUnit || 0) * item.quantity;
         if (item.certifications && Array.isArray(item.certifications)) {
             item.certifications.forEach(cert => {
                 totalCertificationCost += parseFloat(cert.cost) || 0;
@@ -177,26 +222,27 @@ export const calculateDDP = (items, settings, overrides = {}) => {
         if (overrides.domesticChinaShippingOverride !== null && overrides.domesticChinaShippingOverride !== undefined) {
             domesticChinaShipping = overrides.domesticChinaShippingOverride;
         } else {
-            const domesticChinaRate = overrides.domesticChinaPerCbmOverride || rates.domesticChinaPerCbm;
-            domesticChinaShipping = totalCbm * domesticChinaRate;
+            domesticChinaShipping = totalCbm * rates.domesticChinaPerCbm;
         }
     }
 
-    // Calculate freight subtotal
     const freightSubtotal = seaFreightTotal + domesticChinaShipping;
 
-    // CIF Value (Cost + Insurance + Freight)
-    const cifValue = totalExwCost + freightSubtotal;
-    const insurance = cifValue * rates.insuranceRate;
-    const cifWithInsurance = cifValue + insurance;
+    // Calculate CIF value and insurance
+    const cifValueBeforeInsurance = totalExwCost + freightSubtotal;
+    const insurance = cifValueBeforeInsurance * rates.insuranceRate;
+    const cifValue = cifValueBeforeInsurance + insurance;
 
-    // Convert to QAR for Qatar charges
-    const cifValueQar = cifWithInsurance * rates.usdToQar;
+    // Calculate Qatar charges
+    const cifValueQar = cifValue * rates.usdToQar;
     const invoiceValueQar = totalExwCost * rates.usdToQar;
-
-    // Qatar customs and clearance (all in QAR)
     const qatarCharges = calculateQatarFees(containers, cifValueQar, invoiceValueQar, rates);
-    const totalQatarChargesQar = Object.values(qatarCharges).reduce((a, b) => a + b, 0);
+    
+    const totalQatarChargesQar = Object.values(qatarCharges).reduce((total, value) => {
+        const numValue = Number(value) || 0; // Convert to number, default to 0 if NaN
+        return total + numValue;
+    }, 0);
+    
     const totalQatarChargesUsd = totalQatarChargesQar / rates.usdToQar;
 
     // Certification cost (base + per-item certifications)
@@ -210,27 +256,28 @@ export const calculateDDP = (items, settings, overrides = {}) => {
     let commission = 0;
 
     if (settings.profitMarginMode === 'percentage') {
-        profitMargin = landedCostBeforeMargin * settings.profitMargin;
+        profitMargin = landedCostBeforeMargin * profitMarginSetting;
     } else {
-        profitMargin = settings.profitMargin; // Fixed USD amount
+        profitMargin = profitMarginSetting; // Fixed USD amount
     }
 
     const costWithMargin = landedCostBeforeMargin + profitMargin;
 
     if (settings.commissionMode === 'percentage') {
-        commission = costWithMargin * settings.commissionRate;
+        commission = costWithMargin * commissionRateSetting;
     } else {
-        commission = settings.commissionRate; // Fixed USD amount
+        commission = commissionRateSetting; // Fixed USD amount
     }
 
     const ddpTotal = costWithMargin + commission;
 
     // Per-item breakdown
     const itemBreakdowns = items.map(item => {
-        const itemTotal = item.unitPrice * item.quantity;
-        const valueRatio = itemTotal / totalExwCost;
+        const unitPrice = item.unitPrice ?? item.exwPrice ?? 0; // single source of truth for price
+        const itemTotal = unitPrice * item.quantity;
+        const valueRatio = totalExwCost > 0 ? itemTotal / totalExwCost : 0;
         const itemCbm = item.cbmPerUnit * item.quantity;
-        const cbmRatio = itemCbm / totalCbm;
+        const cbmRatio = totalCbm > 0 ? itemCbm / totalCbm : 0;
 
         // Calculate item-specific certification cost
         const itemCertificationCost = (item.certifications || []).reduce((sum, cert) => sum + (parseFloat(cert.cost) || 0), 0);
@@ -246,21 +293,23 @@ export const calculateDDP = (items, settings, overrides = {}) => {
 
         // Calculate profit margin (percentage or fixed USD)
         const itemMargin = settings.profitMarginMode === 'percentage'
-            ? itemLandedCost * settings.profitMargin
-            : settings.profitMargin * valueRatio;
+            ? itemLandedCost * profitMarginSetting
+            : profitMarginSetting * valueRatio;
 
         const itemWithMargin = itemLandedCost + itemMargin;
 
         // Calculate commission (percentage or fixed USD)
         const itemCommission = settings.commissionMode === 'percentage'
-            ? itemWithMargin * settings.commissionRate
-            : settings.commissionRate * valueRatio;
+            ? itemWithMargin * commissionRateSetting
+            : commissionRateSetting * valueRatio;
 
         const itemDdpTotal = itemWithMargin + itemCommission;
-        const ddpPerUnit = itemDdpTotal / item.quantity;
+        const ddpPerUnit = item.quantity > 0 ? itemDdpTotal / item.quantity : 0;
 
         return {
             ...item,
+            unitPrice,
+            exwPrice: unitPrice, // keep for backward compatibility in consumers
             itemCbm,
             valueRatio,
             cbmRatio,
@@ -291,7 +340,7 @@ export const calculateDDP = (items, settings, overrides = {}) => {
     // If LCL is present, add only the remaining CBM (not full shipment)
     if (containers.includes('LCL')) {
         const lclCbm = totalCbm - fullContainerCapacity;
-        totalCapacity += lclCbm;
+        totalCapacity += lclCbm > 0 ? lclCbm : 0;
     }
 
     const containerUtilization = totalCapacity > 0 ? (totalCbm / totalCapacity) * 100 : 0;
@@ -308,13 +357,13 @@ export const calculateDDP = (items, settings, overrides = {}) => {
             containerUtilization,
         },
         costs: {
-            totalExwCost,
+            totalExwCost, // base product cost using normalized unit price
             seaFreight: seaFreightTotal,
             domesticChinaShipping,
             freightSubtotal,
             insurance,
             cifValue,
-            cifWithInsurance,
+            cifValueBeforeInsurance,
             cifValueQar,
             qatarCharges,
             totalQatarChargesQar,
@@ -328,4 +377,32 @@ export const calculateDDP = (items, settings, overrides = {}) => {
         itemBreakdowns,
         rates,
     };
+};
+
+/**
+ * Main DDP calculation function, wrapped with memoization to prevent re-render loops.
+ * @param {Array} inputItems - Array of item objects
+ * @param {object} settings - Settings object (containerType, profitMargin, etc.)
+ * @param {object} overrides - Rate overrides
+ * @returns {object|null} Complete DDP calculation results
+ */
+export const calculateDDP = (inputItems, settings, overrides = {}) => {
+    // Include version in input key to force recalculation if code version changes
+    // Removed CALC_VERSION as debug is complete, but keeping structure for future safety
+    const currentInput = { inputItems, settings, overrides };
+
+    // If input is the same as the last call, return the cached result.
+    // This is the key to breaking the infinite re-render loop.
+    if (deepCompare(currentInput, lastInput)) {
+        return lastResult;
+    }
+
+    // If input is different, perform the full calculation.
+    const result = performDDPCalculation(inputItems, settings, overrides);
+
+    // Cache the new input and result for the next call.
+    lastInput = currentInput;
+    lastResult = result;
+
+    return result;
 };

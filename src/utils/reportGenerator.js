@@ -2,23 +2,6 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatCurrency, formatNumber } from './formatters';
 
-// Helper to convert image URL to base64
-const loadImageAsBase64 = async (url) => {
-    try {
-        const response = await fetch(url);
-        const blob = await response.blob();
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
-    } catch (error) {
-        console.error('Error loading image:', error);
-        return null;
-    }
-};
-
 export const generatePDFReport = async (results, items, settings, previewResults = null, reportName = '') => {
     if (!results) return null;
 
@@ -30,281 +13,536 @@ export const generatePDFReport = async (results, items, settings, previewResults
     const contentWidth = pageWidth - 2 * margin;
     let yPos = margin;
 
-    // Header
-    doc.setFillColor(59, 130, 246);
-    doc.roundedRect(margin, yPos, contentWidth, 25, 3, 3, 'F');
+    // PAGE 1 - EXECUTIVE SUMMARY
+    // Header section with gradient-like effect
+    doc.setFillColor(44, 62, 80); // Dark navy blue
+    doc.rect(0, 0, pageWidth, 65, 'F');
+    
+    // Main title
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
+    doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
-    doc.text('🚢 DDP Cost Report', margin + 3, yPos + 9);
+    doc.text('DDP COST CALCULATION REPORT', pageWidth / 2, 25, { align: 'center' });
+    
+    // Subtitle
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
-    doc.text('China → Qatar Shipping Analysis', margin + 3, yPos + 17);
+    doc.text('Arabian Trade Route', pageWidth / 2, 40, { align: 'center' });
+    doc.text('China → Qatar (Hamad Port)', pageWidth / 2, 52, { align: 'center' });
+
+    yPos = 75;
+
+    // Company name with green highlight
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(46, 204, 113); // Green
+    doc.text(reportName || 'ARTIVIO DESIGN INTERIOR', pageWidth / 2, yPos, { align: 'center' });
+
+    yPos = 95;
+
+    // Generation info with subtle background
+    doc.setFillColor(248, 249, 250);
+    doc.rect(margin, yPos - 5, contentWidth, 20, 'F');
+    doc.setTextColor(108, 117, 125);
     doc.setFontSize(9);
-    doc.text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, margin + 3, yPos + 22);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${new Date().toLocaleTimeString('en-US')}`, margin + 5, yPos + 3);
+    doc.text('Exchange Rate: 1 USD = 3.65 QAR', margin + 5, yPos + 11);
+    yPos += 25;
+
+    // Executive Summary section
+    doc.setFillColor(46, 204, 113); // Professional green
+    doc.roundedRect(margin, yPos, contentWidth, 12, 3, 3, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('EXECUTIVE SUMMARY', margin + 8, yPos + 8);
+
+    yPos += 18;
+    doc.setTextColor(52, 58, 64);
+    doc.setFontSize(10);
+
+    // Summary table with better formatting
+    const summaryData = [
+        ['Total Items:', summary.totalItems.toString(), 'Total Volume:', `${formatNumber(summary.totalCbm, 2)} CBM`],
+        ['Total Quantity:', `${formatNumber(summary.totalQuantity, 0)} units`, 'Total Weight:', '0.00 kg'],
+        ['Container(s):', summary.containers.join(', '), 'Utilization:', `${formatNumber(summary.containerUtilization, 1)}%`]
+    ];
+
+    // Add subtle background for summary data
+    doc.setFillColor(248, 249, 250);
+    doc.rect(margin, yPos, contentWidth, 24, 'F');
+    
+    summaryData.forEach(([label1, value1, label2, value2], i) => {
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(108, 117, 125);
+        doc.text(label1, margin + 8, yPos + 5 + (i * 7));
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(52, 58, 64);
+        doc.text(value1, margin + 85, yPos + 5 + (i * 7));
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(108, 117, 125);
+        doc.text(label2, margin + 200, yPos + 5 + (i * 7));
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(52, 58, 64);
+        doc.text(value2, margin + 285, yPos + 5 + (i * 7));
+    });
+
     yPos += 30;
 
-    // Report Name (if provided)
-    if (reportName) {
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(52, 211, 153); // Emerald color
-        doc.text(reportName, pageWidth / 2, yPos, { align: 'center' });
-        doc.setTextColor(0, 0, 0); // Reset to black
-        yPos += 12;
+    // Cost summary boxes with shadow effect
+    const boxHeight = 22;
+    const boxWidth = contentWidth / 2 - 8;
+    
+    // EXW Cost Box with subtle shadow
+    doc.setFillColor(220, 220, 220);
+    doc.rect(margin + 2, yPos + 2, boxWidth, boxHeight, 'F'); // Shadow
+    doc.setFillColor(248, 249, 250);
+    doc.rect(margin, yPos, boxWidth, boxHeight, 'F');
+    doc.setLineWidth(0.5);
+    doc.setDrawColor(206, 212, 218);
+    doc.rect(margin, yPos, boxWidth, boxHeight, 'S');
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(108, 117, 125);
+    doc.text('EXW Total Cost:', margin + 8, yPos + 8);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(52, 58, 64);
+    doc.text(formatCurrency(costs.totalExwCost), margin + 8, yPos + 17);
+
+    // DDP Cost Box with green styling
+    const ddpBoxX = margin + contentWidth / 2 + 8;
+    doc.setFillColor(200, 230, 201); // Light green shadow
+    doc.rect(ddpBoxX + 2, yPos + 2, boxWidth, boxHeight, 'F'); // Shadow
+    doc.setFillColor(46, 204, 113);
+    doc.rect(ddpBoxX, yPos, boxWidth, boxHeight, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text('DDP Total Cost:', ddpBoxX + 8, yPos + 8);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text(formatCurrency(costs.ddpTotal), ddpBoxX + 8, yPos + 17);
+
+    // Cost increase with better styling
+    const costIncrease = costs.ddpTotal - costs.totalExwCost;
+    const increasePercentage = (costIncrease / costs.totalExwCost) * 100;
+    doc.setFontSize(9);
+    doc.setTextColor(108, 117, 125);
+    doc.setFont('helvetica', 'italic');
+    doc.text(`Cost Increase: ${formatCurrency(costIncrease)} (${formatNumber(increasePercentage, 1)}%)`, ddpBoxX + 8, yPos + 28);
+
+    yPos += 40;
+
+    // Shipment Items section
+    doc.setFillColor(52, 152, 219); // Professional blue
+    doc.roundedRect(margin, yPos, contentWidth, 12, 3, 3, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SHIPMENT ITEMS', margin + 8, yPos + 8);
+
+    yPos += 18;
+
+    // Items table - matching target format exactly
+    const tableColumns = [
+        { header: 'ID', dataKey: 'id' },
+        { header: 'Item', dataKey: 'item' },
+        { header: 'Qty', dataKey: 'qty' },
+        { header: 'Unit', dataKey: 'unit' },
+        { header: 'CBM', dataKey: 'cbm' },
+        { header: 'FOB Total', dataKey: 'fobTotal' },
+        { header: '+Freight', dataKey: 'freight' },
+        { header: '+Clearance', dataKey: 'clearance' },
+        { header: 'DDP Total', dataKey: 'ddpTotal' },
+        { header: 'DDP Total (QAR)', dataKey: 'ddpQar' },
+        { header: 'DDP/Unit', dataKey: 'ddpUnit' },
+        { header: 'DDP/Unit (QAR)', dataKey: 'ddpUnitQar' }
+    ];
+
+    const tableRows = items.map((item, index) => {
+        const breakdown = itemBreakdowns[index] || {};
+        const unitPrice = item.unitPrice ?? item.exwPrice ?? 0;
+        const total = unitPrice * item.quantity;
+        
+        return {
+            id: (index + 1).toString(),
+            item: item.item || item.description || `Item ${index + 1}`,
+            qty: item.quantity.toString(),
+            unit: 'set',
+            cbm: formatNumber(breakdown.itemCbm || 0, 1),
+            fobTotal: formatCurrency(total),
+            freight: formatCurrency(breakdown.allocatedFreight || 0),
+            clearance: formatCurrency(breakdown.allocatedQatarCharges || 0),
+            ddpTotal: formatCurrency(breakdown.itemDdpTotal || 0),
+            ddpQar: `QAR ${formatNumber((breakdown.itemDdpTotal || 0) * rates.usdToQar, 2)}`,
+            ddpUnit: formatCurrency(breakdown.ddpPerUnit || 0),
+            ddpUnitQar: `QAR ${formatNumber((breakdown.ddpPerUnit || 0) * rates.usdToQar, 2)}`
+        };
+    });
+
+    // Add total row
+    tableRows.push({
+        id: '',
+        item: 'TOTAL',
+        qty: '',
+        unit: '',
+        cbm: '',
+        fobTotal: '',
+        freight: '',
+        clearance: '',
+        ddpTotal: formatCurrency(costs.ddpTotal),
+        ddpQar: `QAR ${formatNumber(costs.ddpTotal * rates.usdToQar, 2)}`,
+        ddpUnit: '',
+        ddpUnitQar: ''
+    });
+
+    autoTable(doc, {
+        columns: tableColumns,
+        body: tableRows,
+        startY: yPos,
+        margin: { left: margin, right: margin },
+        styles: {
+            fontSize: 7,
+            cellPadding: 1.5,
+            overflow: 'linebreak',
+            valign: 'middle'
+        },
+        headStyles: {
+            fillColor: [52, 152, 219], // Professional blue
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: 7,
+            halign: 'center'
+        },
+        alternateRowStyles: {
+            fillColor: [248, 249, 250]
+        },
+        bodyStyles: {
+            textColor: [52, 58, 64]
+        },
+        columnStyles: {
+            id: { halign: 'center', cellWidth: 10 },
+            item: { fontStyle: 'bold', cellWidth: 40 },
+            qty: { halign: 'center', cellWidth: 12 },
+            unit: { halign: 'center', cellWidth: 12 },
+            cbm: { halign: 'right', cellWidth: 15 },
+            fobTotal: { halign: 'right', cellWidth: 20 },
+            freight: { halign: 'right', cellWidth: 20 },
+            clearance: { halign: 'right', cellWidth: 22 },
+            ddpTotal: { halign: 'right', fontStyle: 'bold', cellWidth: 20 },
+            ddpQar: { halign: 'right', textColor: [139, 92, 246], cellWidth: 25 },
+            ddpUnit: { halign: 'right', cellWidth: 20 },
+            ddpUnitQar: { halign: 'right', textColor: [139, 92, 246], cellWidth: 25 }
+        },
+        didParseCell: function(data) {
+            if (data.row.index === tableRows.length - 1) {
+                data.cell.styles.fillColor = [240, 240, 240];
+                data.cell.styles.fontStyle = 'bold';
+            }
+        }
+    });
+
+    yPos = doc.lastAutoTable.finalY + 15;
+
+    // Check if we need a new page for calculation settings
+    if (yPos > pageHeight - 80) {
+        doc.addPage();
+        yPos = margin;
     }
 
-    // Customs Preview Comparison (if applicable)
-    if (previewResults) {
-        doc.setFillColor(244, 63, 94); // Rose color
-        doc.roundedRect(margin, yPos, contentWidth, 8, 2, 2, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.text('⚠ CUSTOMS PREVIEW COMPARISON', margin + 3, yPos + 5.5);
-
-        yPos += 12;
-        doc.setTextColor(0, 0, 0);
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'italic');
-        doc.text('Preview with Reduced Declaration for Customs Planning', margin + 5, yPos);
-        yPos += 8;
-
-        // Three column comparison
-        const colWidth = contentWidth / 3;
-        doc.setFillColor(250, 250, 250);
-        doc.rect(margin, yPos, contentWidth, 25, 'F');
-
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Actual DDP', margin + colWidth * 0.5, yPos + 5, { align: 'center' });
-        doc.text('Preview DDP', margin + colWidth * 1.5, yPos + 5, { align: 'center' });
-        doc.text('Difference', margin + colWidth * 2.5, yPos + 5, { align: 'center' });
-
-        doc.setFontSize(13);
-        doc.setTextColor(0, 0, 0);
-        doc.text(formatCurrency(costs.ddpTotal), margin + colWidth * 0.5, yPos + 13, { align: 'center' });
-
-        doc.setTextColor(16, 185, 129);
-        doc.text(formatCurrency(previewResults.costs.ddpTotal), margin + colWidth * 1.5, yPos + 13, { align: 'center' });
-
-        doc.setTextColor(16, 185, 129);
-        const difference = costs.ddpTotal - previewResults.costs.ddpTotal;
-        doc.text(`-${formatCurrency(difference)}`, margin + colWidth * 2.5, yPos + 13, { align: 'center' });
-
-        yPos += 28;
-
-        // Additional details
-        doc.setTextColor(0, 0, 0);
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Invoice Value: ${formatCurrency(costs.totalExwCost)} → ${formatCurrency(previewResults.costs.totalExwCost)}`, margin + 5, yPos);
-        yPos += 4;
-        const actualFreight = costs.domesticChinaShipping + costs.seaFreight;
-        const previewFreight = previewResults.costs.domesticChinaShipping + previewResults.costs.seaFreight;
-        doc.text(`Shipping Cost: ${formatCurrency(actualFreight)} → ${formatCurrency(previewFreight)}`, margin + 5, yPos);
-        yPos += 8;
-    }
-
-    // Shipment Summary
-    doc.setTextColor(0, 0, 0);
-    doc.setFillColor(139, 92, 246);
-    doc.roundedRect(margin, yPos, contentWidth, 7, 2, 2, 'F');
+    // Calculation Settings
+    doc.setFillColor(155, 89, 182); // Professional purple
+    doc.roundedRect(margin, yPos, contentWidth, 10, 3, 3, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text('📊 Shipment Summary', margin + 3, yPos + 5);
+    doc.text('CALCULATION SETTINGS', margin + 8, yPos + 7);
 
-    yPos += 11;
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(9);
+    yPos += 15;
+    
+    // Add subtle background for settings
+    doc.setFillColor(248, 249, 250);
+    doc.rect(margin, yPos, contentWidth, 22, 'F');
+    
+    doc.setTextColor(52, 58, 64);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
 
-    const summaryLeft = [
-        `Total Items: ${summary.totalItems}`,
-        `Total Quantity: ${formatNumber(summary.totalQuantity, 0)}`,
-        `Total CBM: ${formatNumber(summary.totalCbm, 2)} m³`
+    // Calculate actual percentages used in calculations
+    const actualProfitMarginPercent = costs.landedCostBeforeMargin > 0 
+        ? (costs.profitMargin / costs.landedCostBeforeMargin) * 100 
+        : 0;
+    const actualCommissionPercent = (costs.landedCostBeforeMargin + costs.profitMargin) > 0
+        ? (costs.commission / (costs.landedCostBeforeMargin + costs.profitMargin)) * 100
+        : 0;
+
+    const settingsData = [
+        ['Container Selection:', 'Auto (Optimized)'],
+        ['Profit Margin:', `${formatNumber(actualProfitMarginPercent, 1)}% (${settings.profitMarginMode || 'percentage'})`],
+        ['Commission:', `${formatNumber(actualCommissionPercent, 1)}% (${settings.commissionMode || 'percentage'})`]
     ];
 
-    const summaryRight = [
-        `Container(s): ${summary.containers.join(', ')}`,
-        `Utilization: ${formatNumber(summary.containerUtilization, 1)}%`,
-        `${settings.pricingMode === 'FOB' ? 'FOB' : 'EXW'} Total: ${formatCurrency(summary.totalExwCost)}`
-    ];
-
-    summaryLeft.forEach((text, i) => {
-        doc.text(text, margin + 5, yPos + (i * 5));
+    settingsData.forEach(([label, value], i) => {
+        doc.setTextColor(108, 117, 125);
+        doc.text(label, margin + 8, yPos + 5 + (i * 6));
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(52, 58, 64);
+        doc.text(value, margin + 130, yPos + 5 + (i * 6));
+        doc.setFont('helvetica', 'normal');
     });
 
-    summaryRight.forEach((text, i) => {
-        doc.text(text, margin + contentWidth / 2, yPos + (i * 5));
-    });
+    // PAGE 2 - DETAILED BREAKDOWN
+    doc.addPage();
+    yPos = margin;
+
+    // Page 2 Header with professional styling
+    doc.setFillColor(230, 126, 34); // Professional orange
+    doc.roundedRect(margin, yPos, contentWidth, 12, 3, 3, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DETAILED COST BREAKDOWN', margin + 8, yPos + 8);
 
     yPos += 20;
 
-    // Cost Breakdown
-    doc.setFillColor(59, 130, 246);
-    doc.roundedRect(margin, yPos, contentWidth, 7, 2, 2, 'F');
-    doc.setTextColor(255, 255, 255);
+    // 1. China Costs with styled section
+    doc.setFillColor(236, 240, 241);
+    doc.rect(margin, yPos, contentWidth, 8, 'F');
+    doc.setTextColor(52, 58, 64);
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text('💰 Cost Breakdown', margin + 3, yPos + 5);
+    doc.text('1. CHINA COSTS (USD)', margin + 5, yPos + 5);
+    yPos += 12;
 
-    yPos += 11;
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(9);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(52, 58, 64);
+    doc.text('EXW Product Cost', margin + 15, yPos);
+    doc.setFont('helvetica', 'bold');
+    doc.text(formatCurrency(costs.totalExwCost), margin + contentWidth - 15, yPos, { align: 'right' });
+    yPos += 8;
 
-    const costBreakdown = [
-        [`${settings.pricingMode === 'FOB' ? 'FOB' : 'EXW'} Product Cost`, formatCurrency(costs.totalExwCost)],
+    if (settings.pricingMode === 'EXW') {
+        doc.setFont('helvetica', 'normal');
+        doc.text('Domestic China Shipping', margin + 15, yPos);
+        doc.setFont('helvetica', 'bold');
+        doc.text(formatCurrency(costs.domesticChinaShipping || 0), margin + contentWidth - 15, yPos, { align: 'right' });
+        yPos += 8;
+    }
+
+    yPos += 8;
+
+    // 2. International Shipping with styled section
+    doc.setFillColor(236, 240, 241);
+    doc.rect(margin, yPos, contentWidth, 8, 'F');
+    doc.setTextColor(52, 58, 64);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('2. INTERNATIONAL SHIPPING (USD)', margin + 5, yPos + 5);
+    yPos += 12;
+
+    const shippingCosts = [
         ['Sea Freight', formatCurrency(costs.seaFreight)],
-        ['Insurance', formatCurrency(costs.insurance)],
-        ['CIF Value', formatCurrency(costs.cifWithInsurance)],
-        ['Customs Duty (5%)', formatCurrency(costs.qatarCharges.customsDuty / rates.usdToQar)],
-        ['Qatar Clearance Fees', formatCurrency(costs.totalQatarChargesUsd - costs.qatarCharges.customsDuty / rates.usdToQar)],
-        ['Certification Cost', formatCurrency(costs.certificationCost)],
+        ['Insurance (0.5% of CIF)', formatCurrency(costs.insurance)],
+        ['Certification', formatCurrency(costs.certificationCost)],
+        ['CIF Value', formatCurrency(costs.cifValue)]
+    ];
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(52, 58, 64);
+    shippingCosts.forEach(([label, value]) => {
+        doc.text(label, margin + 15, yPos);
+        doc.setFont('helvetica', 'bold');
+        doc.text(value, margin + contentWidth - 15, yPos, { align: 'right' });
+        doc.setFont('helvetica', 'normal');
+        yPos += 7;
+    });
+
+    yPos += 8;
+
+    // 3. Qatar Clearance Costs with styled section
+    doc.setFillColor(236, 240, 241);
+    doc.rect(margin, yPos, contentWidth, 8, 'F');
+    doc.setTextColor(52, 58, 64);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('3. QATAR CLEARANCE COSTS (QAR)', margin + 5, yPos + 5);
+    yPos += 12;
+
+    // Single source of truth for Qatar charge line items
+    const qatarChargeItems = [
+        // Government & Customs section
+        { section: 'Government & Customs', items: [
+            ['Customs Duty (5%)', costs.qatarCharges.customsDuty],
+            ['Mwani Charges', costs.qatarCharges.mwaniCharges]
+        ]},
+        
+        // CMA CGM Shipping Line section  
+        { section: 'CMA CGM Shipping Line Fees', items: [
+            ['Delivery Order', costs.qatarCharges.deliveryOrderFees],
+            ['Terminal Handling (THC)', costs.qatarCharges.terminalHandling],
+            ['Container Return', costs.qatarCharges.containerReturn],
+            ['Container Maintenance', costs.qatarCharges.containerMaintenance],
+            ['Terminal Inspection', costs.qatarCharges.terminalInspection],
+            ['Inspection Charge', costs.qatarCharges.inspectionCharge]
+        ]},
+        
+        // MOFA Attestation section
+        { section: 'MOFA Attestation (Tiered)', items: [
+            ['Commercial Invoice', costs.qatarCharges.documentAttestation - 150],
+            ['Certificate of Origin', 150]
+        ]},
+        
+        // Clearance & Delivery section (single canonical clearance charge)
+        { section: 'Clearance & Delivery', items: [
+            ['Clearance Charges', costs.qatarCharges.clearanceCharges],
+            ['Local Transport', costs.qatarCharges.localTransport]
+        ]}
+    ];
+    
+    // Validate and render sections
+    let calculatedTotal = 0;
+    qatarChargeItems.forEach(({ section, items }) => {
+        // Section header
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(108, 117, 125);
+        doc.text(`${section}:`, margin + 15, yPos);
+        yPos += 8;
+        
+        // Section items
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(52, 58, 64);
+        items.forEach(([label, value]) => {
+            // Validate each item
+            if (typeof value !== 'number' || isNaN(value)) {
+                throw new Error(`Invalid Qatar charge item: ${label} = ${value}`);
+            }
+            calculatedTotal += value;
+            
+            doc.text(label, margin + 25, yPos);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`QAR ${formatNumber(value, 2)}`, margin + contentWidth - 15, yPos, { align: 'right' });
+            doc.setFont('helvetica', 'normal');
+            yPos += section === 'MOFA Attestation (Tiered)' ? 6 : 7;
+        });
+        
+        yPos += 5;
+    });
+    
+    // Validation: ensure displayed total matches calculated total
+    if (Math.abs(calculatedTotal - costs.totalQatarChargesQar) > 0.01) {
+        throw new Error(`Qatar charges mismatch: displayed=${calculatedTotal}, calculated=${costs.totalQatarChargesQar}`);
+    }
+
+    // Total Qatar Charges with emphasis
+    doc.setFillColor(248, 249, 250);
+    doc.rect(margin + 10, yPos - 2, contentWidth - 20, 12, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(52, 58, 64);
+    doc.text('Total Qatar Charges:', margin + 15, yPos + 3);
+    doc.text(`QAR ${formatNumber(costs.totalQatarChargesQar, 2)}`, margin + contentWidth - 15, yPos + 3, { align: 'right' });
+    yPos += 8;
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(108, 117, 125);
+    doc.text('(Converted to USD):', margin + 15, yPos);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(52, 58, 64);
+    doc.text(formatCurrency(costs.totalQatarChargesUsd), margin + contentWidth - 15, yPos, { align: 'right' });
+
+    yPos += 15;
+
+    // 4. Final Costs with styled section
+    doc.setFillColor(236, 240, 241);
+    doc.rect(margin, yPos, contentWidth, 8, 'F');
+    doc.setTextColor(52, 58, 64);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('4. FINAL COSTS (USD)', margin + 5, yPos + 5);
+    yPos += 12;
+
+    const finalCosts = [
+        ['Landed Cost (before margin)', formatCurrency(costs.ddpTotal - costs.profitMargin - costs.commission)],
         ['Profit Margin', formatCurrency(costs.profitMargin)],
         ['Commission', formatCurrency(costs.commission)]
     ];
 
-    if (settings.pricingMode === 'EXW') {
-        costBreakdown.splice(1, 0, ['Domestic China Shipping', formatCurrency(costs.domesticChinaShipping)]);
-    }
-
-    costBreakdown.forEach(([label, value], i) => {
-        doc.text(label, margin + 5, yPos + (i * 4));
-        doc.text(value, margin + contentWidth - 5, yPos + (i * 4), { align: 'right' });
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(52, 58, 64);
+    finalCosts.forEach(([label, value]) => {
+        doc.text(label, margin + 15, yPos);
+        doc.setFont('helvetica', 'bold');
+        doc.text(value, margin + contentWidth - 15, yPos, { align: 'right' });
+        doc.setFont('helvetica', 'normal');
+        yPos += 7;
     });
 
-    yPos += (costBreakdown.length * 4) + 3;
+    yPos += 8;
 
-    // Total DDP
-    doc.setFillColor(240, 240, 240);
-    doc.rect(margin, yPos, contentWidth, 7, 'F');
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(16, 185, 129);
-    doc.text('Total DDP Cost', margin + 5, yPos + 5);
-    doc.text(formatCurrency(costs.ddpTotal), margin + contentWidth - 5, yPos + 5, { align: 'right' });
-
-    yPos += 12;
-
-    // Per-Item DDP Costs
+    // Total DDP Price with professional highlight and shadow
+    const totalBoxHeight = 18;
+    
+    // Shadow effect
+    doc.setFillColor(200, 230, 201);
+    doc.rect(margin + 2, yPos + 2, contentWidth, totalBoxHeight, 'F');
+    
+    // Main box
+    doc.setFillColor(46, 204, 113);
+    doc.rect(margin, yPos, contentWidth, totalBoxHeight, 'F');
+    
+    // Border
+    doc.setLineWidth(1);
+    doc.setDrawColor(39, 174, 96);
+    doc.rect(margin, yPos, contentWidth, totalBoxHeight, 'S');
+    
     doc.setTextColor(255, 255, 255);
-    doc.setFillColor(16, 185, 129);
-    doc.roundedRect(margin, yPos, contentWidth, 7, 2, 2, 'F');
-    doc.setFontSize(11);
+    doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text('📦 Per-Item DDP Costs', margin + 3, yPos + 5);
+    doc.text('TOTAL DDP PRICE:', margin + 12, yPos + 12);
+    doc.setFontSize(16);
+    doc.text(formatCurrency(costs.ddpTotal), margin + contentWidth - 12, yPos + 12, { align: 'right' });
 
-    yPos += 10;
-
-    // Warning for preview mode
-    if (previewResults) {
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'italic');
-        doc.setTextColor(244, 63, 94);
-        doc.text('⚠ Showing Preview Values (Reduced Declaration) - Actual values in parentheses', margin + 5, yPos);
-        yPos += 8;
-        doc.setTextColor(0, 0, 0);
-    }
-
-    // Items table with preview support
-    const itemsTableData = itemBreakdowns.map((item, index) => {
-        const previewItem = previewResults ? previewResults.itemBreakdowns[index] : null;
-
-        if (previewItem) {
-            return [
-                (index + 1).toString(),  // ID column
-                item.description || `Item ${index + 1}`,
-                formatNumber(item.quantity, 0),
-                item.unitType || 'pcs',
-                formatNumber(item.itemCbm, 2),
-                `${formatCurrency(previewItem.exwPrice * previewItem.quantity)}\n(${formatCurrency(item.exwPrice * item.quantity)})`,
-                `${formatCurrency(previewItem.allocatedFreight)}\n(${formatCurrency(item.allocatedFreight)})`,
-                `${formatCurrency(previewItem.allocatedQatarCharges)}\n(${formatCurrency(item.allocatedQatarCharges)})`,
-                `${formatCurrency(previewItem.itemDdpTotal)}\n(${formatCurrency(item.itemDdpTotal)})`,
-                `QAR ${formatNumber(previewItem.itemDdpTotal * rates.usdToQar, 2)}\n(QAR ${formatNumber(item.itemDdpTotal * rates.usdToQar, 2)})`,
-                `${formatCurrency(previewItem.ddpPerUnit)}\n(${formatCurrency(item.ddpPerUnit)})`,
-                `QAR ${formatNumber(previewItem.ddpPerUnit * rates.usdToQar, 2)}\n(QAR ${formatNumber(item.ddpPerUnit * rates.usdToQar, 2)})`
-            ];
-        }
-
-        return [
-            (index + 1).toString(),  // ID column
-            item.description || `Item ${index + 1}`,
-            formatNumber(item.quantity, 0),
-            item.unitType || 'pcs',
-            formatNumber(item.itemCbm, 2),
-            formatCurrency(item.exwPrice * item.quantity),
-            formatCurrency(item.allocatedFreight),
-            formatCurrency(item.allocatedQatarCharges),
-            formatCurrency(item.itemDdpTotal),
-            `QAR ${formatNumber(item.itemDdpTotal * rates.usdToQar, 2)}`,
-            formatCurrency(item.ddpPerUnit),
-            `QAR ${formatNumber(item.ddpPerUnit * rates.usdToQar, 2)}`
-        ];
-    });
-
-    // Add total row
-    if (previewResults) {
-        itemsTableData.push([
-            { content: 'TOTAL', colSpan: 8, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-            `${formatCurrency(previewResults.costs.ddpTotal)}\n(${formatCurrency(costs.ddpTotal)})`,
-            `QAR ${formatNumber(previewResults.costs.ddpTotal * rates.usdToQar, 2)}\n(QAR ${formatNumber(costs.ddpTotal * rates.usdToQar, 2)})`,
-            '', ''
-        ]);
+    // Check if we need space for notes, if not add new page
+    if (yPos > pageHeight - 90) {
+        doc.addPage();
+        yPos = margin;
     } else {
-        itemsTableData.push([
-            { content: 'TOTAL', colSpan: 8, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
-            formatCurrency(costs.ddpTotal),
-            `QAR ${formatNumber(costs.ddpTotal * rates.usdToQar, 2)}`,
-            '', ''
-        ]);
+        yPos += 15;
     }
 
-    autoTable(doc, {
-        startY: yPos,
-        head: [['ID', 'Item', 'Qty', 'Unit', 'CBM', `${settings.pricingMode === 'FOB' ? 'FOB' : 'EXW'} Total`, '+Freight', '+Clearance', 'DDP Total', 'DDP Total\n(QAR)', 'DDP/Unit', 'DDP/Unit\n(QAR)']],
-        body: itemsTableData,
-        theme: 'striped',
-        headStyles: { fillColor: [59, 130, 246], fontSize: 6.5, fontStyle: 'bold' },
-        styles: {
-            fontSize: previewResults ? 5.5 : 6.5,
-            cellPadding: 1.5,
-            lineColor: [200, 200, 200],
-            lineWidth: 0.1
-        },
-        columnStyles: {
-            0: { halign: 'center', cellWidth: 8 },    // ID
-            1: { cellWidth: 32 },                      // Item (kept large)
-            2: { halign: 'center', cellWidth: 8 },    // Qty
-            3: { halign: 'center', cellWidth: 8 },    // Unit
-            4: { halign: 'right', cellWidth: 10 },    // CBM
-            5: { halign: 'right', cellWidth: 15 },    // EXW Total
-            6: { halign: 'right', cellWidth: 15 },    // +Freight
-            7: { halign: 'right', cellWidth: 15 },    // +Clearance
-            8: { halign: 'right', cellWidth: 16, fontStyle: 'bold' },    // DDP Total
-            9: { halign: 'right', cellWidth: 16, fontStyle: 'bold', textColor: [139, 92, 246] },    // DDP Total (QAR)
-            10: { halign: 'right', cellWidth: 16, fontStyle: 'bold' },   // DDP/Unit
-            11: { halign: 'right', cellWidth: 16, fontStyle: 'bold', textColor: [139, 92, 246] }    // DDP/Unit (QAR)
-        },
-        margin: { left: margin, right: margin }
+    // Add notes
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+
+    const notes = [
+        'Notes:',
+        '• Rates based on CMA CGM tariff (October 2023)',
+        '• MOFA attestation fees are tiered based on invoice value',
+        '• All costs are estimated and subject to change',
+        '• This is an internal calculation report for planning purposes'
+    ];
+
+    notes.forEach((note, i) => {
+        if (i === 0) {
+            doc.setFont('helvetica', 'bold');
+        } else {
+            doc.setFont('helvetica', 'normal');
+        }
+        doc.text(note, margin, yPos + (i * 4));
     });
 
-    yPos = doc.lastAutoTable.finalY + 8;
-
-    // Footer notes
-    doc.setFontSize(8);
+    // Page number at bottom
+    const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
     doc.setTextColor(100, 100, 100);
-    doc.setFont('helvetica', 'italic');
-    doc.text('Exchange Rate: 1 USD = 3.65 QAR | DDP (Delivered Duty Paid) includes all costs to Qatar', margin, yPos);
-    yPos += 4;
-    doc.text('Generated with Claude Code | All calculations based on official rates', margin, yPos);
-
-    // Footer removed per user request
-    const pageCount = doc.internal.getNumberOfPages();
-    doc.setPage(pageCount);
+    doc.setFontSize(8);
+    doc.text(`Page ${currentPage}`, pageWidth / 2, pageHeight - 15, { align: 'center' });
 
     return doc;
 };

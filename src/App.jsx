@@ -19,9 +19,9 @@ function App() {
 
     const [settings, setSettings] = useState({
         containerType: 'auto',
-        profitMargin: 0,
+        profitMargin: DEFAULT_RATES.profitMargin, // default to standard 15%
         profitMarginMode: 'percentage',
-        commissionRate: 0,
+        commissionRate: DEFAULT_RATES.commissionRate, // default to 6%
         commissionMode: 'percentage',
         pricingMode: 'EXW', // EXW or FOB
     });
@@ -56,41 +56,39 @@ function App() {
         setItems(updated);
     };
 
-    // Calculate results
-    const results = useMemo(() => {
+    // Unified calculation hook to prevent re-render loops
+    const { results, previewResults } = useMemo(() => {
         const validItems = items.filter(item => item.quantity > 0 && item.unitPrice > 0 && item.cbmPerUnit > 0);
-        if (validItems.length === 0) return null;
-        return calculateDDP(validItems, settings, overrides);
-    }, [items, settings, overrides]);
+        if (validItems.length === 0) {
+            return { results: null, previewResults: null };
+        }
 
-    // Calculate preview results with reduced declaration
-    const previewResults = useMemo(() => {
-        if (!customsPreview.enabled) return null;
+        // 1. Calculate the main results
+        const mainResults = calculateDDP(validItems, settings, overrides);
 
-        const validItems = items.filter(item => item.quantity > 0 && item.unitPrice > 0 && item.cbmPerUnit > 0);
-        if (validItems.length === 0) return null;
+        // 2. Calculate preview results only if needed
+        let preview = null;
+        if (customsPreview.enabled && mainResults) {
+            const actualInvoiceTotal = validItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+            const actualFreightTotal = mainResults.costs.domesticChinaShipping + mainResults.costs.seaFreight;
 
-        const actualInvoiceTotal = validItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
-        const actualResults = calculateDDP(validItems, settings, overrides);
-        const actualFreightTotal = actualResults.costs.domesticChinaShipping + actualResults.costs.seaFreight;
+            const invoiceRatio = customsPreview.invoiceCostOverride ? customsPreview.invoiceCostOverride / actualInvoiceTotal : 1;
 
-        const invoiceRatio = customsPreview.invoiceCostOverride ? customsPreview.invoiceCostOverride / actualInvoiceTotal : 1;
-        const freightRatio = customsPreview.shippingCostOverride ? customsPreview.shippingCostOverride / actualFreightTotal : 1;
+            const adjustedItems = validItems.map(item => ({
+                ...item,
+                unitPrice: item.unitPrice * invoiceRatio,
+            }));
 
-        // Adjust item prices proportionally
-        const adjustedItems = validItems.map(item => ({
-            ...item,
-            unitPrice: item.unitPrice * invoiceRatio,
-        }));
+            const previewOverrides = {
+                ...overrides,
+                seaFreightOverride: customsPreview.shippingCostOverride || overrides.seaFreightOverride,
+                domesticChinaShippingOverride: 0,
+            };
 
-        // Override shipping costs for preview
-        const previewOverrides = {
-            ...overrides,
-            seaFreightOverride: customsPreview.shippingCostOverride || overrides.seaFreightOverride,
-            domesticChinaShippingOverride: 0,
-        };
+            preview = calculateDDP(adjustedItems, settings, previewOverrides);
+        }
 
-        return calculateDDP(adjustedItems, settings, previewOverrides);
+        return { results: mainResults, previewResults: preview };
     }, [items, settings, overrides, customsPreview]);
 
     // Import/Export handlers

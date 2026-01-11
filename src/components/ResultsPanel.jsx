@@ -1,7 +1,7 @@
 import Card from './Card';
 import CostRow from './CostRow';
 import { formatCurrency, formatNumber } from '../utils/formatters';
-import { downloadPDFReport } from '../utils/reportGenerator';
+import { generatePDFReport } from '../utils/modernReportGenerator';
 
 const ResultsPanel = ({ results, items, settings, previewResults = null, customsPreviewEnabled = false, reportName = '' }) => {
     if (!results) return null;
@@ -12,11 +12,12 @@ const ResultsPanel = ({ results, items, settings, previewResults = null, customs
 
     const handleDownloadReport = async () => {
         try {
-            console.log('Generating PDF report...');
+            console.log('Generating modern PDF report...');
+            const doc = await generatePDFReport(results, items, settings, previewResults, reportName);
             const timestamp = new Date().toISOString().slice(0, 10);
-            const filename = `DDP-Report-${timestamp}.pdf`;
-            await downloadPDFReport(results, items, settings, filename, previewResults, reportName);
-            console.log('PDF report generated successfully!');
+            const filename = `DDP-Report-Modern-${timestamp}.pdf`;
+            doc.save(filename);
+            console.log('Modern PDF report generated successfully!');
         } catch (error) {
             console.error('Error generating PDF report:', error);
             alert('Error generating PDF report. Please check the console for details.');
@@ -132,8 +133,8 @@ const ResultsPanel = ({ results, items, settings, previewResults = null, customs
 
                 <CostRow
                     label="CIF Value"
-                    amount={costs.cifWithInsurance}
-                    previewAmount={previewResults?.costs.cifWithInsurance}
+                    amount={costs.cifValue}
+                    previewAmount={previewResults?.costs.cifValue}
                     showPreview={customsPreviewEnabled && previewResults}
                 />
 
@@ -147,8 +148,8 @@ const ResultsPanel = ({ results, items, settings, previewResults = null, customs
 
                 <CostRow
                     label="Qatar Clearance Fees"
-                    amount={costs.totalQatarChargesUsd - costs.qatarCharges.customsDuty}
-                    previewAmount={previewResults ? previewResults.costs.totalQatarChargesUsd - previewResults.costs.qatarCharges.customsDuty : null}
+                    amount={costs.qatarCharges.clearanceCharges / rates.usdToQar}
+                    previewAmount={previewResults ? previewResults.costs.qatarCharges.clearanceCharges / rates.usdToQar : null}
                     showPreview={customsPreviewEnabled && previewResults}
                     indent
                 />
@@ -208,7 +209,7 @@ const ResultsPanel = ({ results, items, settings, previewResults = null, customs
                         onMouseEnter={e => e.target.style.transform = 'translateY(-2px)'}
                         onMouseLeave={e => e.target.style.transform = 'translateY(0)'}
                     >
-                        📄 Download PDF Report
+                        📄 Modern PDF Report
                     </button>
                     <button
                         onClick={handleGenerateQuotation}
@@ -268,6 +269,8 @@ const ResultsPanel = ({ results, items, settings, previewResults = null, customs
                             {itemBreakdowns.map((item, i) => {
                                 const previewItem = customsPreviewEnabled && previewResults ? previewResults.itemBreakdowns[i] : null;
                                 const showPreview = customsPreviewEnabled && previewItem;
+                                const basePrice = item.unitPrice ?? item.exwPrice ?? 0;
+                                const previewPrice = previewItem ? (previewItem.unitPrice ?? previewItem.exwPrice ?? 0) : 0;
 
                                 return (
                                     <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -284,15 +287,15 @@ const ResultsPanel = ({ results, items, settings, previewResults = null, customs
                                             {showPreview && (
                                                 <>
                                                     <span style={{ color: 'var(--accent-emerald)', fontWeight: '600' }}>
-                                                        {formatCurrency(previewItem.exwPrice * previewItem.quantity)}
+                                                        {formatCurrency(previewPrice * previewItem.quantity)}
                                                     </span>
                                                     <br />
                                                     <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                                                        ({formatCurrency(item.exwPrice * item.quantity)})
+                                                        ({formatCurrency(basePrice * item.quantity)})
                                                     </span>
                                                 </>
                                             )}
-                                            {!showPreview && formatCurrency(item.exwPrice * item.quantity)}
+                                            {!showPreview && formatCurrency(basePrice * item.quantity)}
                                         </td>
                                         <td style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--text-primary)' }} className="mono">
                                             {showPreview && (

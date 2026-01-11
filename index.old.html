@@ -224,25 +224,39 @@
                 totalExwCost += item.exwPrice * item.quantity;
             });
 
-            // Determine container configuration
+            // Determine container configuration (aligned with app logic)
             let containers = [];
-            let remainingCbm = totalCbm;
-            
-            // Simple container allocation (prioritize 40HC for efficiency)
-            while (remainingCbm > 0) {
-                if (remainingCbm > CONTAINER_SPECS['40GP'].cbm) {
-                    containers.push('40HC');
-                    remainingCbm -= CONTAINER_SPECS['40HC'].cbm;
-                } else if (remainingCbm > CONTAINER_SPECS['20GP'].cbm) {
-                    containers.push('40GP');
-                    remainingCbm -= CONTAINER_SPECS['40GP'].cbm;
-                } else if (remainingCbm > 15) {
-                    containers.push('20GP');
-                    remainingCbm -= CONTAINER_SPECS['20GP'].cbm;
-                } else {
-                    // LCL - use 20GP pricing pro-rated
-                    containers.push('LCL');
-                    remainingCbm = 0;
+
+            // Very small shipments use LCL
+            if (totalCbm <= 15) {
+                containers = ['LCL'];
+            } else if (totalCbm <= CONTAINER_SPECS['20GP'].cbm) {
+                containers = ['20GP'];
+            } else if (totalCbm <= CONTAINER_SPECS['40GP'].cbm && totalCbm <= CONTAINER_SPECS['20GP'].cbm * 1.2) {
+                containers = ['40GP'];
+            } else {
+                // Greedy allocation for larger volumes
+                let remainingCbm = totalCbm;
+                while (remainingCbm > 0) {
+                    if (remainingCbm >= CONTAINER_SPECS['40HC'].cbm) {
+                        containers.push('40HC');
+                        remainingCbm -= CONTAINER_SPECS['40HC'].cbm;
+                    } else if (remainingCbm >= CONTAINER_SPECS['40GP'].cbm) {
+                        containers.push('40GP');
+                        remainingCbm -= CONTAINER_SPECS['40GP'].cbm;
+                    } else if (remainingCbm >= CONTAINER_SPECS['20GP'].cbm) {
+                        containers.push('20GP');
+                        remainingCbm -= CONTAINER_SPECS['20GP'].cbm;
+                    } else {
+                        if (remainingCbm > CONTAINER_SPECS['40GP'].cbm / 2) {
+                            containers.push('40HC');
+                        } else if (remainingCbm > CONTAINER_SPECS['20GP'].cbm / 2) {
+                            containers.push('20GP');
+                        } else {
+                            containers.push('LCL');
+                        }
+                        remainingCbm = 0;
+                    }
                 }
             }
 
@@ -277,10 +291,12 @@
             // CIF Value (Cost + Insurance + Freight)
             const cifValue = totalExwCost + freightSubtotal;
             const insurance = cifValue * rates.insuranceRate;
-            const cifWithInsurance = cifValue + insurance;
+            const cifValueBeforeInsurance = cifValue;
+            const insurance = cifValueBeforeInsurance * rates.insuranceRate;
+            const cifWithInsurance = cifValueBeforeInsurance + insurance;
 
-            // Convert to QAR for Qatar charges
-            const cifValueQar = cifWithInsurance * rates.usdToQar;
+            // For Qatar customs - use CIF before insurance to avoid inflated customs base
+            const cifValueQar = cifValueBeforeInsurance * rates.usdToQar;
 
             // Qatar customs and clearance (all in QAR)
             const customsDuty = cifValueQar * rates.qatarClearance.customsDutyRate;

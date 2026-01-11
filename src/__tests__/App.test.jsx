@@ -478,12 +478,8 @@ describe('App', () => {
             await user.type(priceInputs[0], '50');
 
             // Step 3: Adjust profit margin
-            const allZeroInputs = screen.getAllByDisplayValue('0');
-            // Find the profit margin input (should be one of the later zero values)
-            const profitMarginInput = allZeroInputs.find(input =>
-                input.closest('div')?.textContent?.includes('Profit') ||
-                input.previousElementSibling?.textContent?.includes('Profit')
-            ) || allZeroInputs[allZeroInputs.length - 2];
+            const profitMarginContainer = screen.getAllByText('Profit Margin')[0].parentElement;
+            const profitMarginInput = profitMarginContainer.querySelector('input');
             await user.clear(profitMarginInput);
             await user.type(profitMarginInput, '20');
 

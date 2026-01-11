@@ -1,10 +1,14 @@
 export const QUOTATION_COLORS = {
-    primary: '#2E7D32',      // Green
-    secondary: '#1565C0',    // Blue
-    background: '#FAFAFA',   // Light gray
-    white: '#FFFFFF',
-    textDark: '#212121',
-    textMuted: '#757575'
+    primary: '#D65A1F',      // Burnt Orange - Primary accent
+    secondary: '#EC722D',    // Light Burnt Orange - Secondary accent  
+    navy: '#1B2B38',         // Navy Blue - Primary text, headings
+    coolGray: '#6A7B8C',     // Cool Gray - Secondary text, outlines
+    lightGray: '#F5F5F5',    // Light Gray - Background blocks, cards
+    desertSand: '#EADCC2',   // Desert Sand - Soft background tint
+    background: '#FFFDF7',   // Background White - Page background
+    white: '#FFFFFF',        // Pure white for contrast
+    textDark: '#1B2B38',     // Navy Blue for primary text
+    textMuted: '#6A7B8C'     // Cool Gray for secondary text
 };
 
 export const DEFAULT_COMPANY_INFO = {

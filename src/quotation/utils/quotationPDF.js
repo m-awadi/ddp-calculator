@@ -237,18 +237,50 @@ export const generateQuotationPDF = async (data) => {
         }
     }
 
-    // Page 2 - Terms
-    doc.addPage();
+    // Check if we need a new page for terms section
+    const checkPageSpace = (requiredHeight) => {
+        if (yPos + requiredHeight > pageHeight - margin - 30) {
+            doc.addPage();
+            // Add page background
+            doc.setFillColor(backgroundRGB.r, backgroundRGB.g, backgroundRGB.b);
+            doc.rect(0, 0, pageWidth, pageHeight, 'F');
+            
+            yPos = margin;
+            // Add logo on top right
+            addLogo(pageWidth - margin - 30, yPos, 30, 30);
+            yPos += 40;
+            return true;
+        }
+        return false;
+    };
 
-    // Add page background
-    doc.setFillColor(backgroundRGB.r, backgroundRGB.g, backgroundRGB.b);
-    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+    // Calculate estimated height for terms section
+    const estimateTermsHeight = () => {
+        let height = 50; // Header + margins
+        height += (deliveryTerms.length * 6) + 10; // Delivery terms
+        height += (timelineTerms.length * 6) + 10; // Timeline terms  
+        height += (paymentTerms.length * 6) + 10; // Payment terms
+        height += 80; // Bank details section
+        return height;
+    };
 
-    yPos = margin;
-
-    // Add logo on top right
-    addLogo(pageWidth - margin - 30, yPos, 30, 30);
-    yPos += 40;
+    const termsHeight = estimateTermsHeight();
+    
+    // Only add new page if current page doesn't have enough space
+    if (yPos + termsHeight > pageHeight - margin - 30) {
+        doc.addPage();
+        // Add page background
+        doc.setFillColor(backgroundRGB.r, backgroundRGB.g, backgroundRGB.b);
+        doc.rect(0, 0, pageWidth, pageHeight, 'F');
+        
+        yPos = margin;
+        // Add logo on top right
+        addLogo(pageWidth - margin - 30, yPos, 30, 30);
+        yPos += 40;
+    } else {
+        // Add some spacing before terms on same page
+        yPos += 20;
+    }
 
     // Terms header
     doc.setFontSize(12);
@@ -257,7 +289,7 @@ export const generateQuotationPDF = async (data) => {
     doc.text(preserveArabicText('معلومات خاصة بالعرض:'), pageWidth - margin, yPos, { align: 'right', lang: 'ar' });
     yPos += 10;
 
-    // Delivery section
+    // Delivery section  
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(60, 60, 60);
@@ -267,6 +299,7 @@ export const generateQuotationPDF = async (data) => {
     doc.setFont('helvetica', 'normal');
     deliveryTerms.forEach(term => {
         if (term.trim()) {
+            checkPageSpace(12); // Check space before each line
             doc.text(preserveArabicText('○ ' + term), pageWidth - margin, yPos, { align: 'right', maxWidth: pageWidth - 2 * margin, lang: 'ar' });
             yPos += 6;
         }
@@ -274,6 +307,7 @@ export const generateQuotationPDF = async (data) => {
     yPos += 4;
 
     // Timeline section
+    checkPageSpace(20); // Check space for timeline section
     doc.setFont('helvetica', 'bold');
     doc.text(preserveArabicText('● المدة الزمنية:'), pageWidth - margin, yPos, { align: 'right', lang: 'ar' });
     yPos += 6;
@@ -281,6 +315,7 @@ export const generateQuotationPDF = async (data) => {
     doc.setFont('helvetica', 'normal');
     timelineTerms.forEach(term => {
         if (term.trim()) {
+            checkPageSpace(12);
             doc.text(preserveArabicText('○ ' + term), pageWidth - margin, yPos, { align: 'right', maxWidth: pageWidth - 2 * margin, lang: 'ar' });
             yPos += 6;
         }
@@ -288,6 +323,7 @@ export const generateQuotationPDF = async (data) => {
     yPos += 4;
 
     // Payment section
+    checkPageSpace(25); // Check space for payment section
     doc.setFont('helvetica', 'bold');
     doc.text(preserveArabicText('● الدفع:'), pageWidth - margin, yPos, { align: 'right', lang: 'ar' });
     yPos += 6;
@@ -295,11 +331,15 @@ export const generateQuotationPDF = async (data) => {
     doc.setFont('helvetica', 'normal');
     paymentTerms.forEach(term => {
         if (term.trim()) {
+            checkPageSpace(12);
             doc.text(preserveArabicText('○ ' + term), pageWidth - margin, yPos, { align: 'right', maxWidth: pageWidth - 2 * margin, lang: 'ar' });
             yPos += 6;
         }
     });
     yPos += 8;
+
+    // Check space for bank transfers section
+    checkPageSpace(50);
 
     // Bank transfers section
     doc.setFont('helvetica', 'bold');
@@ -309,6 +349,10 @@ export const generateQuotationPDF = async (data) => {
     doc.setFont('helvetica', 'normal');
     doc.text(preserveArabicText('يتم التحويل على الحساب البنكي الخاص بالشركة بالتفاصيل التالية:'), pageWidth - margin, yPos, { align: 'right', maxWidth: pageWidth - 2 * margin, lang: 'ar' });
     yPos += 10;
+
+    // Check space for entire bank details block
+    const bankDetailsHeight = 40; // Estimated height for bank details
+    checkPageSpace(bankDetailsHeight);
 
     // Bank details
     doc.setFont('helvetica', 'normal');

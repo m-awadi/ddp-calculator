@@ -294,7 +294,7 @@ describe('calculations', () => {
 
         it('should use exchange rate 3.65 for QAR conversion', () => {
             const result = calculateDDP(sampleItems, sampleSettings);
-            expect(result.costs.cifValueQar).toBeCloseTo(result.costs.cifWithInsurance * 3.65, 2);
+            expect(result.costs.cifValueQar).toBeCloseTo(result.costs.cifValueBeforeInsurance * 3.65, 2);
         });
     });
 

@@ -5,6 +5,11 @@
  * @returns {string} Formatted currency string
  */
 export const formatCurrency = (amount, currency = 'USD') => {
+    // Handle invalid inputs
+    if (amount === null || amount === undefined || isNaN(amount)) {
+        return currency === 'USD' ? '$0.00' : `${currency} 0.00`;
+    }
+    
     const formatter = new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: currency,
@@ -21,6 +26,11 @@ export const formatCurrency = (amount, currency = 'USD') => {
  * @returns {string} Formatted number string
  */
 export const formatNumber = (num, decimals = 2) => {
+    // Handle invalid inputs
+    if (num === null || num === undefined || isNaN(num)) {
+        return '0.00';
+    }
+    
     return new Intl.NumberFormat('en-US', {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals,
