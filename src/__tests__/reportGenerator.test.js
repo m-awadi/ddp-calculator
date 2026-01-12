@@ -10,12 +10,15 @@ vi.mock('jspdf', () => {
                     getWidth: () => 210,
                     getHeight: () => 297
                 },
-                getNumberOfPages: () => 1
+                getNumberOfPages: () => 1,
+                getCurrentPageInfo: () => ({ pageNumber: 1 })
             };
             this.setFillColor = vi.fn();
             this.setTextColor = vi.fn();
             this.setFontSize = vi.fn();
             this.setFont = vi.fn();
+            this.setLineWidth = vi.fn();
+            this.setDrawColor = vi.fn();
             this.rect = vi.fn();
             this.roundedRect = vi.fn();
             this.text = vi.fn();
@@ -61,23 +64,22 @@ describe('reportGenerator', () => {
                 domesticChinaShipping: 157.5,
                 freightSubtotal: 3357.5,
                 insurance: 24.29,
-                cifValue: 4857.5,
                 cifValue: 4881.79,
                 cifValueQar: 17818.53,
                 qatarCharges: {
                     customsDuty: 891.93,
-                    deliveryOrder: 1000,
+                    mwaniCharges: 160,
+                    deliveryOrderFees: 1000,
                     terminalHandling: 1000,
                     containerReturn: 300,
                     containerMaintenance: 40.04,
-                    mwani: 160,
                     terminalInspection: 35,
                     inspectionCharge: 50,
-                    clearanceAgent: 250,
+                    clearanceCharges: 250,
                     documentAttestation: 1150,
                     localTransport: 800
                 },
-                totalQatarChargesQar: 5677,
+                totalQatarChargesQar: 5676.97,
                 totalQatarChargesUsd: 1555.61,
                 certificationCost: 150,
                 landedCostBeforeMargin: 7589.40,

@@ -208,19 +208,24 @@ const performDDPCalculation = (inputItems, settings, overrides) => {
         containers = [settings.containerType];
     }
 
-    // Calculate sea freight
-    let seaFreightTotal = calculateSeaFreight(containers, rates);
+    const pricingMode = settings.pricingMode || 'EXW';
+
+    // Calculate sea freight (CIF includes freight/insurance in price)
+    let seaFreightTotal = pricingMode === 'CIF' ? 0 : calculateSeaFreight(containers, rates);
 
     // Override if specified
-    if (overrides.seaFreightOverride) {
+    if (pricingMode !== 'CIF' && overrides.seaFreightOverride) {
         seaFreightTotal = overrides.seaFreightOverride;
     }
 
-    // Domestic China shipping (only for EXW, FOB includes it in the price)
+    // Domestic China shipping (only for EXW, FOB/CIF include it in the price)
     let domesticChinaShipping = 0;
-    if (settings.pricingMode === 'EXW' || !settings.pricingMode) {
+    if (pricingMode === 'EXW' || !settings.pricingMode) {
+        const perCbmOverride = overrides.domesticChinaPerCbmOverride ?? overrides.domesticChinaPerCbm;
         if (overrides.domesticChinaShippingOverride !== null && overrides.domesticChinaShippingOverride !== undefined) {
             domesticChinaShipping = overrides.domesticChinaShippingOverride;
+        } else if (perCbmOverride !== null && perCbmOverride !== undefined) {
+            domesticChinaShipping = totalCbm * perCbmOverride;
         } else {
             domesticChinaShipping = totalCbm * rates.domesticChinaPerCbm;
         }
@@ -229,9 +234,14 @@ const performDDPCalculation = (inputItems, settings, overrides) => {
     const freightSubtotal = seaFreightTotal + domesticChinaShipping;
 
     // Calculate CIF value and insurance
-    const cifValueBeforeInsurance = totalExwCost + freightSubtotal;
-    const insurance = cifValueBeforeInsurance * rates.insuranceRate;
-    const cifValue = cifValueBeforeInsurance + insurance;
+    let cifValueBeforeInsurance = totalExwCost + freightSubtotal;
+    let insurance = cifValueBeforeInsurance * rates.insuranceRate;
+    let cifValue = cifValueBeforeInsurance + insurance;
+    if (pricingMode === 'CIF') {
+        cifValueBeforeInsurance = totalExwCost;
+        insurance = 0;
+        cifValue = totalExwCost;
+    }
 
     // Calculate Qatar charges
     const cifValueQar = cifValue * rates.usdToQar;

@@ -5,7 +5,7 @@ const ItemRow = ({ item, index, onUpdate, onRemove, pricingMode = 'EXW' }) => {
     const [showCertifications, setShowCertifications] = useState(false);
 
     // Dynamic price label based on pricing mode
-    const priceLabel = pricingMode === 'FOB' ? 'FOB Price' : 'EXW Price';
+    const priceLabel = pricingMode === 'FOB' ? 'FOB Price' : pricingMode === 'CIF' ? 'CIF Price' : 'EXW Price';
 
     // CBM input mode handling
     const cbmInputMode = item.cbmInputMode || 'perUnit';
@@ -133,7 +133,7 @@ const ItemRow = ({ item, index, onUpdate, onRemove, pricingMode = 'EXW' }) => {
                 />
             </div>
 
-            {/* EXW/FOB Price */}
+            {/* EXW/FOB/CIF Price */}
             <div>
                 {index === 0 && (
                     <label style={{

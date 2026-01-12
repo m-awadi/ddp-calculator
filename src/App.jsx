@@ -24,7 +24,7 @@ function App() {
         profitMarginMode: 'percentage',
         commissionRate: DEFAULT_RATES.commissionRate, // default to 6%
         commissionMode: 'percentage',
-        pricingMode: 'EXW', // EXW or FOB
+        pricingMode: 'EXW', // EXW, FOB, or CIF
     });
 
     const [overrides, setOverrides] = useState({
@@ -499,11 +499,14 @@ function App() {
                                 >
                                     <option value="EXW">EXW (Ex Works)</option>
                                     <option value="FOB">FOB (Free On Board)</option>
+                                    <option value="CIF">CIF (Cost, Insurance & Freight)</option>
                                 </select>
                                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>
                                     {settings.pricingMode === 'EXW'
                                         ? 'Buyer pays domestic China shipping'
-                                        : 'Domestic shipping included in price'}
+                                        : settings.pricingMode === 'FOB'
+                                            ? 'Domestic shipping included in price'
+                                            : 'Price includes sea freight and insurance to Qatar port'}
                                 </p>
                             </div>
 

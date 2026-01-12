@@ -8,7 +8,7 @@ const ResultsPanel = ({ results, items, settings, previewResults = null, customs
 
     const { summary, costs, itemBreakdowns, rates } = results;
     const pricingMode = settings?.pricingMode || 'EXW';
-    const priceLabel = pricingMode === 'FOB' ? 'FOB' : 'EXW';
+    const priceLabel = pricingMode === 'FOB' ? 'FOB' : pricingMode === 'CIF' ? 'CIF' : 'EXW';
 
     const handleDownloadReport = async () => {
         try {

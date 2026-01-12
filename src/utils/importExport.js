@@ -11,7 +11,8 @@ export const generateTemplate = () => {
             usage: 'Fill in the items array with your products, adjust settings, and import this file',
             pricingModes: {
                 EXW: 'Ex Works - Buyer pays domestic China shipping',
-                FOB: 'Free On Board - Domestic shipping included in price'
+                FOB: 'Free On Board - Domestic shipping included in price',
+                CIF: 'Cost, Insurance & Freight - Price includes sea freight and insurance'
             },
             containerTypes: ['auto', '20GP', '40GP', '40HC', 'LCL'],
             fields: {
@@ -19,7 +20,7 @@ export const generateTemplate = () => {
                     description: 'Product name or description',
                     quantity: 'Number of units',
                     unitType: 'Unit type (e.g., pcs, roll, box) - optional',
-                    unitPrice: 'Price per unit in USD (EXW or FOB depending on pricing mode)',
+                    unitPrice: 'Price per unit in USD (EXW, FOB, or CIF depending on pricing mode)',
                     cbmPerUnit: 'Volume per unit in cubic meters',
                     weightPerUnit: 'Weight per unit in kilograms',
                     cbmInputMode: 'perUnit or total',
@@ -27,7 +28,7 @@ export const generateTemplate = () => {
                     certifications: 'Array of {name: string, cost: number} for product certifications'
                 },
                 settings: {
-                    pricingMode: 'EXW or FOB',
+                    pricingMode: 'EXW, FOB, or CIF',
                     containerType: 'auto, 20GP, 40GP, 40HC, or LCL',
                     profitMargin: 'Profit margin value',
                     profitMarginMode: 'percentage or fixed',
@@ -205,9 +206,18 @@ export const importFormData = (jsonString) => {
             throw new Error(validation.error);
         }
 
+        const pricingModeRaw = data.settings?.pricingMode || 'EXW';
+        const pricingMode = typeof pricingModeRaw === 'string'
+            ? pricingModeRaw.toUpperCase()
+            : 'EXW';
+        const normalizedPricingMode = ['EXW', 'FOB', 'CIF'].includes(pricingMode) ? pricingMode : 'EXW';
+
         return {
             items: data.items || [],
-            settings: data.settings || {},
+            settings: {
+                ...(data.settings || {}),
+                pricingMode: normalizedPricingMode
+            },
             overrides: data.overrides || {},
             customsPreview: data.customsPreview || { enabled: false, invoiceCostOverride: null, shippingCostOverride: null },
             reportName: data.reportName || ''

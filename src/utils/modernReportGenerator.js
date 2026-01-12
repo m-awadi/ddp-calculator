@@ -169,7 +169,7 @@ class ModernPDFBuilder {
         const statsHeight = 20;
 
         const pricingMode = settings?.pricingMode || 'EXW';
-        const priceLabel = pricingMode === 'FOB' ? 'FOB' : 'EXW';
+        const priceLabel = pricingMode === 'FOB' ? 'FOB' : pricingMode === 'CIF' ? 'CIF' : 'EXW';
 
         // Green background for stats
         this.setFillColor([240, 248, 255]);
@@ -399,7 +399,7 @@ export const generatePDFReport = async (results, items, settings, previewResults
         builder.drawSectionPill('SHIPMENT ITEMS', THEME.colors.sectionBlue);
 
         const pricingMode = settings?.pricingMode || 'EXW';
-        const priceLabel = pricingMode === 'FOB' ? 'FOB' : 'EXW';
+        const priceLabel = pricingMode === 'FOB' ? 'FOB' : pricingMode === 'CIF' ? 'CIF' : 'EXW';
 
         // Merged headers to prevent table overflow
         const tableHeaders = ['ID', 'Item Description', 'Qty', 'Unit', 'CBM', `${priceLabel} Total`, 'Freight', 'Clearance', 'DDP Total\n(USD/QAR)', 'DDP/Unit\n(USD/QAR)'];

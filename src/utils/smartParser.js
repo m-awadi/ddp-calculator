@@ -15,7 +15,7 @@ DATE EXTRACTION RULES:
 - **MERGED ROWS**: Be alert for tables with merged cells where a value (like Description) visually applies to multiple rows. If a cell spans multiple rows, apply its value to ALL covered items. Do NOT skip items just because a field looks empty in a specific row.
 - **ITEM CONTINUITY**: Trust the item numbering (e.g., 1, 2, 3...). If a row index exists, it is a valid item, even if it shares data with the row above.
 - Detect the currency. If NOT USD, convert it to USD using the provided exchange rate or your best knowledge of current rates if not provided (assume 1 USD = 3.65 QAR, 1 USD = 7.2 CNY for example, but prefer converting everything to USD).
-- Detect Incoterms (EXW or FOB). If not explicit, infer from context (e.g. "Ex-works", "FOB Shenzhen"). Default to EXW if unsure.
+- Detect Incoterms (EXW, FOB, or CIF). If not explicit, infer from context (e.g. "Ex-works", "FOB Shenzhen", "CIF Doha"). Default to EXW if unsure.
 
 OUTPUT FORMAT:
 You must output PURE JSON matching this schema exactly:
@@ -33,7 +33,7 @@ You must output PURE JSON matching this schema exactly:
     }
   ],
   "settings": {
-    "pricingMode": "EXW" // or "FOB"
+    "pricingMode": "EXW" // or "FOB" or "CIF"
   },
   "originalCurrency": "CNY", // The detected currency
   "exchangeRateUsed": 0.138 // Rate used to convert to USD
@@ -77,6 +77,10 @@ export const smartParseDocument = async (fileData, exchangeRateOverride = null) 
     // Ensure defaults if AI missed them
     if (!data.items) data.items = [];
     if (!data.settings) data.settings = { pricingMode: 'EXW' };
+    if (data.settings.pricingMode) {
+      const pricingMode = String(data.settings.pricingMode).toUpperCase();
+      data.settings.pricingMode = ['EXW', 'FOB', 'CIF'].includes(pricingMode) ? pricingMode : 'EXW';
+    }
 
     // Validate structure (soft validation, try to fix)
     data.items = data.items.map(item => ({

@@ -135,7 +135,7 @@ describe('calculations', () => {
             expect(result).toHaveProperty('containerMaintenance');
             expect(result).toHaveProperty('terminalInspection');
             expect(result).toHaveProperty('inspectionCharge');
-            expect(result).toHaveProperty('clearanceAgentFees');
+            expect(result).toHaveProperty('clearanceCharges');
             expect(result).toHaveProperty('documentAttestation');
             expect(result).toHaveProperty('localTransport');
         });
@@ -178,6 +178,7 @@ describe('calculations', () => {
             profitMarginMode: 'percentage',
             commissionRate: 0.06,
             commissionMode: 'percentage',
+            pricingMode: 'EXW'
         };
 
         it('should return null for empty items array', () => {
@@ -209,6 +210,20 @@ describe('calculations', () => {
         it('should calculate CIF correctly', () => {
             const result = calculateDDP(sampleItems, sampleSettings);
             expect(result.costs.cifValue).toBeGreaterThan(result.costs.totalExwCost);
+        });
+
+        it('should treat CIF pricing as all-in price', () => {
+            const cifSettings = { ...sampleSettings, pricingMode: 'CIF' };
+            const result = calculateDDP(sampleItems, cifSettings, {
+                seaFreightOverride: 5000,
+                domesticChinaShippingOverride: 250
+            });
+
+            expect(result.costs.domesticChinaShipping).toBe(0);
+            expect(result.costs.seaFreight).toBe(0);
+            expect(result.costs.insurance).toBe(0);
+            expect(result.costs.freightSubtotal).toBe(0);
+            expect(result.costs.cifValue).toBeCloseTo(result.costs.totalExwCost, 2);
         });
 
         it('should apply profit margin as percentage', () => {
@@ -294,7 +309,7 @@ describe('calculations', () => {
 
         it('should use exchange rate 3.65 for QAR conversion', () => {
             const result = calculateDDP(sampleItems, sampleSettings);
-            expect(result.costs.cifValueQar).toBeCloseTo(result.costs.cifValueBeforeInsurance * 3.65, 2);
+            expect(result.costs.cifValueQar).toBeCloseTo(result.costs.cifValue * 3.65, 2);
         });
     });
 

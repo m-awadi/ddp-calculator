@@ -37,7 +37,8 @@ describe('Import/Export Functionality', () => {
             profitMargin: 0.15,
             profitMarginMode: 'percentage',
             commissionRate: 0.06,
-            commissionMode: 'percentage'
+            commissionMode: 'percentage',
+            pricingMode: 'EXW'
         };
 
         mockOverrides = {
@@ -83,6 +84,13 @@ describe('Import/Export Functionality', () => {
             const result = exportFormData(mockItems, mockSettings, mockOverrides, mockCustomsPreview);
             const data = JSON.parse(result);
             expect(data.settings).toEqual(mockSettings);
+        });
+
+        it('should preserve CIF pricing mode', () => {
+            const cifSettings = { ...mockSettings, pricingMode: 'CIF' };
+            const result = exportFormData(mockItems, cifSettings, mockOverrides, mockCustomsPreview);
+            const data = JSON.parse(result);
+            expect(data.settings.pricingMode).toBe('CIF');
         });
 
         it('should preserve customs preview data', () => {

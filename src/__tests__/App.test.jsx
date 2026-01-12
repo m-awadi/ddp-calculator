@@ -201,6 +201,23 @@ describe('App', () => {
         });
     });
 
+    describe('Pricing Mode', () => {
+        it('should allow selecting CIF and update price label', async () => {
+            const user = userEvent.setup();
+            render(<App />);
+
+            const selects = screen.getAllByRole('combobox');
+            const pricingSelect = selects[1];
+
+            await user.selectOptions(pricingSelect, 'CIF');
+            expect(pricingSelect).toHaveValue('CIF');
+
+            await waitFor(() => {
+                expect(screen.getByText('CIF Price')).toBeInTheDocument();
+            });
+        });
+    });
+
     describe('Weight Input Mode Toggle', () => {
         it('should toggle weight input mode from per unit to total', async () => {
             const user = userEvent.setup();

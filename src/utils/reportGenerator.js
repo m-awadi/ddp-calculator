@@ -6,6 +6,8 @@ export const generatePDFReport = async (results, items, settings, previewResults
     if (!results) return null;
 
     const { summary, costs, itemBreakdowns, rates } = results;
+    const pricingMode = settings?.pricingMode || 'EXW';
+    const priceLabel = pricingMode === 'FOB' ? 'FOB' : pricingMode === 'CIF' ? 'CIF' : 'EXW';
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -106,7 +108,7 @@ export const generatePDFReport = async (results, items, settings, previewResults
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(108, 117, 125);
-    doc.text('EXW Total Cost:', margin + 8, yPos + 8);
+    doc.text(`${priceLabel} Total Cost:`, margin + 8, yPos + 8);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
     doc.setTextColor(52, 58, 64);
@@ -154,7 +156,7 @@ export const generatePDFReport = async (results, items, settings, previewResults
         { header: 'Qty', dataKey: 'qty' },
         { header: 'Unit', dataKey: 'unit' },
         { header: 'CBM', dataKey: 'cbm' },
-        { header: 'FOB Total', dataKey: 'fobTotal' },
+        { header: `${priceLabel} Total`, dataKey: 'priceTotal' },
         { header: '+Freight', dataKey: 'freight' },
         { header: '+Clearance', dataKey: 'clearance' },
         { header: 'DDP Total', dataKey: 'ddpTotal' },
@@ -174,7 +176,7 @@ export const generatePDFReport = async (results, items, settings, previewResults
             qty: item.quantity.toString(),
             unit: 'set',
             cbm: formatNumber(breakdown.itemCbm || 0, 2),
-            fobTotal: formatCurrency(total),
+            priceTotal: formatCurrency(total),
             freight: formatCurrency(breakdown.allocatedFreight || 0),
             clearance: formatCurrency(breakdown.allocatedQatarCharges || 0),
             ddpTotal: formatCurrency(breakdown.itemDdpTotal || 0),
@@ -191,7 +193,7 @@ export const generatePDFReport = async (results, items, settings, previewResults
         qty: '',
         unit: '',
         cbm: '',
-        fobTotal: '',
+        priceTotal: '',
         freight: '',
         clearance: '',
         ddpTotal: formatCurrency(costs.ddpTotal),
@@ -230,7 +232,7 @@ export const generatePDFReport = async (results, items, settings, previewResults
             qty: { halign: 'center', cellWidth: 12 },
             unit: { halign: 'center', cellWidth: 12 },
             cbm: { halign: 'right', cellWidth: 15 },
-            fobTotal: { halign: 'right', cellWidth: 20 },
+            priceTotal: { halign: 'right', cellWidth: 20 },
             freight: { halign: 'right', cellWidth: 20 },
             clearance: { halign: 'right', cellWidth: 22 },
             ddpTotal: { halign: 'right', fontStyle: 'bold', cellWidth: 20 },
@@ -321,7 +323,7 @@ export const generatePDFReport = async (results, items, settings, previewResults
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(52, 58, 64);
-    doc.text('EXW Product Cost', margin + 15, yPos);
+    doc.text(`${priceLabel} Product Cost`, margin + 15, yPos);
     doc.setFont('helvetica', 'bold');
     doc.text(formatCurrency(costs.totalExwCost), margin + contentWidth - 15, yPos, { align: 'right' });
     yPos += 8;
