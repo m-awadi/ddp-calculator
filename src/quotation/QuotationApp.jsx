@@ -11,6 +11,7 @@ import {
 const QuotationApp = ({ initialItems = [], onClose }) => {
     const [quotationDate, setQuotationDate] = useState(new Date().toISOString().slice(0, 10));
     const [showPictureColumn, setShowPictureColumn] = useState(true);
+    const [showCertificationColumn, setShowCertificationColumn] = useState(false);
     const [quantityUnit, setQuantityUnit] = useState('pcs');
     const [items, setItems] = useState(
         initialItems.length > 0
@@ -18,9 +19,12 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                 description: item.description || '',
                 quantity: item.quantity || 0,
                 price: item.ddpPerUnit ? parseFloat(item.ddpPerUnit.toFixed(2)) : 0,
-                image: null
+                image: null,
+                certificationCost: 0,
+                labTestCost: 0,
+                certificationType: ''
             }))
-            : [{ description: '', quantity: 0, price: 0, image: null }]
+            : [{ description: '', quantity: 0, price: 0, image: null, certificationCost: 0, labTestCost: 0, certificationType: '' }]
     );
 
     const [companyInfo, setCompanyInfo] = useState({ ...DEFAULT_COMPANY_INFO });
@@ -46,7 +50,7 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
     };
 
     const addItem = () => {
-        setItems([...items, { description: '', quantity: 0, price: 0, image: null }]);
+        setItems([...items, { description: '', quantity: 0, price: 0, image: null, certificationCost: 0, labTestCost: 0, certificationType: '' }]);
     };
 
     const removeItem = (index) => {
@@ -57,6 +61,11 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
 
     const totalUSD = items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
     const totalQAR = totalUSD * 3.65; // Keep for backward compatibility
+
+    // Calculate total certification and lab test costs across all items
+    const totalCertificationCost = items.reduce((sum, item) => sum + (item.certificationCost || 0), 0);
+    const totalLabTestCost = items.reduce((sum, item) => sum + (item.labTestCost || 0), 0);
+    const totalCertLabCost = totalCertificationCost + totalLabTestCost;
 
     // Custom blocks management
     const addCustomBlock = () => {
@@ -170,8 +179,12 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                 totalUSD,
                 companyInfo,
                 showPictureColumn,
+                showCertificationColumn,
                 customBlocks,
-                quantityUnit
+                quantityUnit,
+                totalCertificationCost,
+                totalLabTestCost,
+                totalCertLabCost
             });
         } catch (error) {
             console.error('Error generating PDF:', error);
@@ -188,8 +201,12 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                 totalUSD,
                 companyInfo,
                 showPictureColumn,
+                showCertificationColumn,
                 customBlocks,
-                quantityUnit
+                quantityUnit,
+                totalCertificationCost,
+                totalLabTestCost,
+                totalCertLabCost
             });
         } catch (error) {
             console.error('Error generating print preview:', error);
@@ -374,6 +391,15 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                     />
                                     Show Picture Column
                                 </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: QUOTATION_COLORS.textDark, cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={showCertificationColumn}
+                                        onChange={(e) => setShowCertificationColumn(e.target.checked)}
+                                        style={{ cursor: 'pointer' }}
+                                    />
+                                    Show Cert/Lab Test Costs
+                                </label>
                             </div>
                         </div>
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -385,6 +411,7 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                     <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}>Qty ({quantityUnit})</th>
                                     <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}>Price (USD)</th>
                                     <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}>Total (USD)</th>
+                                    {showCertificationColumn && <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}>Cert/Lab Costs</th>}
                                     <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}></th>
                                 </tr>
                             </thead>
@@ -397,18 +424,36 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                         onUpdate={updateItem}
                                         onRemove={removeItem}
                                         showPictureColumn={showPictureColumn}
+                                        showCertificationColumn={showCertificationColumn}
                                     />
                                 ))}
                                 {/* Total Row */}
                                 <tr style={{ background: QUOTATION_COLORS.primary }}>
                                     <td colSpan={showPictureColumn ? "5" : "4"} style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '14px', fontWeight: '700', textAlign: 'right' }}>
-                                        Total
+                                        Product Total
                                     </td>
                                     <td style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '14px', fontWeight: '700', textAlign: 'right' }}>
                                         ${totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
+                                    {showCertificationColumn && (
+                                        <td style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '14px', fontWeight: '700', textAlign: 'right' }}>
+                                            ${totalCertLabCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                    )}
                                     <td></td>
                                 </tr>
+                                {/* Grand Total Row (when certification column shown) */}
+                                {showCertificationColumn && totalCertLabCost > 0 && (
+                                    <tr style={{ background: QUOTATION_COLORS.secondary }}>
+                                        <td colSpan={showPictureColumn ? "5" : "4"} style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '14px', fontWeight: '700', textAlign: 'right' }}>
+                                            Grand Total (Products + Cert/Lab)
+                                        </td>
+                                        <td colSpan="2" style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '14px', fontWeight: '700', textAlign: 'right' }}>
+                                            ${(totalUSD + totalCertLabCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
                         <button

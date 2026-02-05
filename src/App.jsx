@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { calculateDDP } from './utils/calculations.js';
 import { formatCurrency, formatNumber } from './utils/formatters.js';
 import { DEFAULT_RATES } from './utils/constants.js';
@@ -8,10 +8,28 @@ import Input from './components/Input';
 import ItemRow from './components/ItemRow';
 import ResultsPanel from './components/ResultsPanel';
 import SmartImportModal from './components/SmartImportModal';
+import HistoryPanel from './components/HistoryPanel';
+import { useQuotationHistory } from './hooks/useQuotationHistory';
 
 function App() {
     // Refs
     const fileInputRef = useRef(null);
+
+    // History hook
+    const {
+        history,
+        isLoaded: historyLoaded,
+        saveQuotation,
+        loadQuotation,
+        deleteQuotation,
+        renameQuotation,
+        clearHistory,
+        getAutosave,
+        setAutosave,
+    } = useQuotationHistory();
+
+    // History panel state
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
     // State
     const [items, setItems] = useState([
@@ -39,6 +57,43 @@ function App() {
     });
 
     const [reportName, setReportName] = useState('');
+
+    // Restore autosave on mount
+    useEffect(() => {
+        if (historyLoaded) {
+            const autosaved = getAutosave();
+            if (autosaved && autosaved.items && autosaved.items.length > 0) {
+                // Only restore if there's meaningful data
+                const hasData = autosaved.items.some(item =>
+                    item.description || item.quantity > 1 || item.unitPrice > 0
+                );
+                if (hasData) {
+                    setItems(autosaved.items);
+                    if (autosaved.settings) setSettings(autosaved.settings);
+                    if (autosaved.overrides) setOverrides(autosaved.overrides);
+                    if (autosaved.customsPreview) setCustomsPreview(autosaved.customsPreview);
+                    if (autosaved.reportName) setReportName(autosaved.reportName);
+                }
+            }
+        }
+    }, [historyLoaded, getAutosave]);
+
+    // Autosave on state changes (debounced)
+    useEffect(() => {
+        if (!historyLoaded) return;
+
+        const timer = setTimeout(() => {
+            setAutosave({
+                items,
+                settings,
+                overrides,
+                customsPreview,
+                reportName,
+            });
+        }, 1000);
+
+        return () => clearTimeout(timer);
+    }, [items, settings, overrides, customsPreview, reportName, historyLoaded, setAutosave]);
 
     // Item management
     const addItem = () => {
@@ -139,6 +194,35 @@ function App() {
     const triggerImport = () => {
         fileInputRef.current?.click();
     };
+
+    // History handlers
+    const handleSaveToHistory = useCallback((customName = null) => {
+        saveQuotation({
+            items,
+            settings,
+            overrides,
+            customsPreview,
+            reportName,
+            results,
+        }, customName);
+    }, [items, settings, overrides, customsPreview, reportName, results, saveQuotation]);
+
+    const handleLoadFromHistory = useCallback((id) => {
+        const data = loadQuotation(id);
+        if (data) {
+            setItems(data.items || [{ description: '', quantity: 1, unitPrice: 0, unitType: '', cbmPerUnit: 0.01, weightPerUnit: 0, cbmInputMode: 'perUnit', certifications: [] }]);
+            setSettings(data.settings || settings);
+            setOverrides(data.overrides || { seaFreightOverride: null, domesticChinaPerCbmOverride: null });
+            setCustomsPreview(data.customsPreview || { enabled: false, invoiceCostOverride: null, shippingCostOverride: null });
+            setReportName(data.reportName || '');
+        }
+    }, [loadQuotation]);
+
+    const handleDeleteFromHistory = useCallback((id) => {
+        if (confirm('Delete this quotation from history?')) {
+            deleteQuotation(id);
+        }
+    }, [deleteQuotation]);
 
     return (
         <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
@@ -253,6 +337,28 @@ function App() {
                             <span>✨</span>
                             <span>Smart Import</span>
                         </button>
+                        <button
+                            onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+                            style={{
+                                padding: '8px 16px',
+                                background: isHistoryOpen ? 'rgba(34, 197, 94, 0.4)' : 'rgba(34, 197, 94, 0.2)',
+                                border: '1px solid rgba(34, 197, 94, 0.4)',
+                                borderRadius: '8px',
+                                color: 'white',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                transition: '0.2s',
+                            }}
+                            onMouseEnter={e => e.target.style.background = 'rgba(34, 197, 94, 0.4)'}
+                            onMouseLeave={e => e.target.style.background = isHistoryOpen ? 'rgba(34, 197, 94, 0.4)' : 'rgba(34, 197, 94, 0.2)'}
+                        >
+                            <span>📜</span>
+                            <span>History{history.length > 0 ? ` (${history.length})` : ''}</span>
+                        </button>
                         <input
                             ref={fileInputRef}
                             type="file"
@@ -277,6 +383,19 @@ function App() {
                     isOpen={isSmartImportOpen}
                     onClose={() => setIsSmartImportOpen(false)}
                     onImport={handleSmartImportData}
+                />
+
+                {/* History Panel */}
+                <HistoryPanel
+                    isOpen={isHistoryOpen}
+                    onToggle={() => setIsHistoryOpen(!isHistoryOpen)}
+                    history={history}
+                    onLoad={handleLoadFromHistory}
+                    onDelete={handleDeleteFromHistory}
+                    onRename={renameQuotation}
+                    onClearAll={clearHistory}
+                    onSave={handleSaveToHistory}
+                    currentReportName={reportName}
                 />
 
                 <div style={{ display: 'grid', gap: '2rem' }}>

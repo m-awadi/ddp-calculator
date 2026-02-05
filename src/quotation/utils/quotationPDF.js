@@ -30,8 +30,13 @@ export const generateQuotationPDF = async (data) => {
         totalQAR,
         totalUSD,
         companyInfo,
+        showPictureColumn = true,
+        showCertificationColumn = false,
         customBlocks = [],
-        quantityUnit = 'pcs'
+        quantityUnit = 'pcs',
+        totalCertificationCost = 0,
+        totalLabTestCost = 0,
+        totalCertLabCost = 0
     } = data;
 
     const doc = new jsPDF();
@@ -128,14 +133,38 @@ export const generateQuotationPDF = async (data) => {
             `$${item.price.toFixed(2)}`,
             `$${(item.quantity * item.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
         );
+        // Add certification column if enabled
+        if (showCertificationColumn) {
+            const certCost = item.certificationCost || 0;
+            const labCost = item.labTestCost || 0;
+            const totalItemCert = certCost + labCost;
+            let certText = '';
+            if (totalItemCert > 0) {
+                const parts = [];
+                if (item.certificationType) {
+                    parts.push(item.certificationType);
+                }
+                if (certCost > 0) {
+                    parts.push(`Cert: $${certCost.toFixed(2)}`);
+                }
+                if (labCost > 0) {
+                    parts.push(`Lab: $${labCost.toFixed(2)}`);
+                }
+                certText = parts.join('\n');
+            }
+            row.push(certText);
+        }
         return row;
     });
+
+    // Calculate colSpan based on visible columns
+    const baseColSpan = showPictureColumn ? 5 : 4;
 
     // Add total row
     const totalRowData = [];
     totalRowData.push({
-        content: 'Total',
-        colSpan: showPictureColumn ? 5 : 4,
+        content: showCertificationColumn && totalCertLabCost > 0 ? 'Product Total' : 'Total',
+        colSpan: baseColSpan,
         styles: {
             fillColor: [primaryRGB.r, primaryRGB.g, primaryRGB.b],
             textColor: [255, 255, 255],
@@ -152,7 +181,45 @@ export const generateQuotationPDF = async (data) => {
             halign: 'right'
         }
     });
+    // Add certification total column if enabled
+    if (showCertificationColumn) {
+        totalRowData.push({
+            content: totalCertLabCost > 0 ? '$' + totalCertLabCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '',
+            styles: {
+                fillColor: [primaryRGB.r, primaryRGB.g, primaryRGB.b],
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                halign: 'right'
+            }
+        });
+    }
     tableData.push(totalRowData);
+
+    // Add grand total row if certification costs exist
+    if (showCertificationColumn && totalCertLabCost > 0) {
+        const grandTotalRow = [];
+        grandTotalRow.push({
+            content: 'Grand Total (Products + Cert/Lab)',
+            colSpan: baseColSpan,
+            styles: {
+                fillColor: [secondaryRGB.r, secondaryRGB.g, secondaryRGB.b],
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                halign: 'left'
+            }
+        });
+        grandTotalRow.push({
+            content: '$' + (totalUSD + totalCertLabCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            colSpan: 2,
+            styles: {
+                fillColor: [secondaryRGB.r, secondaryRGB.g, secondaryRGB.b],
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                halign: 'right'
+            }
+        });
+        tableData.push(grandTotalRow);
+    }
 
     // Build table header
     const tableHeader = ['Item'];
@@ -160,18 +227,24 @@ export const generateQuotationPDF = async (data) => {
         tableHeader.push('Picture');
     }
     tableHeader.push('Description', `Qty (${quantityUnit})`, 'Price (USD)', 'Total (USD)');
+    if (showCertificationColumn) {
+        tableHeader.push('Cert/Lab Costs');
+    }
 
     // Build column styles
     const columnStyles = {};
     let colIndex = 0;
     columnStyles[colIndex++] = { cellWidth: 15, halign: 'center' }; // Item
     if (showPictureColumn) {
-        columnStyles[colIndex++] = { cellWidth: 60, halign: 'center' }; // PIC (increased from 35)
+        columnStyles[colIndex++] = { cellWidth: showCertificationColumn ? 50 : 60, halign: 'center' }; // PIC (smaller when cert column)
     }
-    columnStyles[colIndex++] = { cellWidth: showPictureColumn ? 50 : 90 }; // Description (wider when no PIC)
-    columnStyles[colIndex++] = { cellWidth: 25, halign: 'center' }; // Qty
-    columnStyles[colIndex++] = { cellWidth: 25, halign: 'right' }; // Price
-    columnStyles[colIndex++] = { cellWidth: 30, halign: 'right' }; // Total
+    columnStyles[colIndex++] = { cellWidth: showPictureColumn ? (showCertificationColumn ? 40 : 50) : 90 }; // Description
+    columnStyles[colIndex++] = { cellWidth: 20, halign: 'center' }; // Qty
+    columnStyles[colIndex++] = { cellWidth: 22, halign: 'right' }; // Price
+    columnStyles[colIndex++] = { cellWidth: 28, halign: 'right' }; // Total
+    if (showCertificationColumn) {
+        columnStyles[colIndex++] = { cellWidth: 35, halign: 'left' }; // Cert/Lab Costs
+    }
 
     autoTable(doc, {
         startY: yPos,

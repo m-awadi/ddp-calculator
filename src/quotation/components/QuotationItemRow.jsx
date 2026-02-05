@@ -1,7 +1,19 @@
 import { useState, useRef } from 'react';
 import { QUOTATION_COLORS } from '../utils/defaultTerms';
 
-const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn = true }) => {
+// Common certification types for dropdown
+const CERTIFICATION_TYPES = [
+    { value: '', label: 'Select Type' },
+    { value: 'SASO', label: 'SASO' },
+    { value: 'COC', label: 'COC (Certificate of Conformity)' },
+    { value: 'Lab Analysis', label: 'Lab Analysis' },
+    { value: 'SABER', label: 'SABER' },
+    { value: 'GCC', label: 'GCC Conformity' },
+    { value: 'ESMA', label: 'ESMA' },
+    { value: 'Other', label: 'Other' }
+];
+
+const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn = true, showCertificationColumn = false }) => {
     const [imagePreview, setImagePreview] = useState(item.image || null);
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef(null);
@@ -305,6 +317,104 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
             }}>
                 ${(item.quantity * item.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </td>
+
+            {/* Certification/Lab Test Costs (when enabled) */}
+            {showCertificationColumn && (
+                <td style={{ padding: '12px 8px', width: '280px', verticalAlign: 'top' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {/* Certification Type Dropdown */}
+                        <select
+                            value={item.certificationType || ''}
+                            onChange={(e) => onUpdate(index, 'certificationType', e.target.value)}
+                            style={{
+                                width: '100%',
+                                padding: '6px 8px',
+                                border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                background: QUOTATION_COLORS.white
+                            }}
+                        >
+                            {CERTIFICATION_TYPES.map(type => (
+                                <option key={type.value} value={type.value}>
+                                    {type.label}
+                                </option>
+                            ))}
+                        </select>
+
+                        {/* Certification Cost Input */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <label style={{
+                                fontSize: '11px',
+                                color: QUOTATION_COLORS.textMuted,
+                                minWidth: '60px'
+                            }}>
+                                Cert. Cost:
+                            </label>
+                            <input
+                                type="number"
+                                value={item.certificationCost || ''}
+                                onChange={(e) => onUpdate(index, 'certificationCost', parseFloat(e.target.value) || 0)}
+                                placeholder="0.00"
+                                min="0"
+                                step="0.01"
+                                style={{
+                                    flex: 1,
+                                    padding: '6px 8px',
+                                    border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                    borderRadius: '4px',
+                                    fontSize: '12px',
+                                    textAlign: 'right'
+                                }}
+                            />
+                            <span style={{ fontSize: '11px', color: QUOTATION_COLORS.textMuted }}>USD</span>
+                        </div>
+
+                        {/* Lab Test Cost Input */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <label style={{
+                                fontSize: '11px',
+                                color: QUOTATION_COLORS.textMuted,
+                                minWidth: '60px'
+                            }}>
+                                Lab Test:
+                            </label>
+                            <input
+                                type="number"
+                                value={item.labTestCost || ''}
+                                onChange={(e) => onUpdate(index, 'labTestCost', parseFloat(e.target.value) || 0)}
+                                placeholder="0.00"
+                                min="0"
+                                step="0.01"
+                                style={{
+                                    flex: 1,
+                                    padding: '6px 8px',
+                                    border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                    borderRadius: '4px',
+                                    fontSize: '12px',
+                                    textAlign: 'right'
+                                }}
+                            />
+                            <span style={{ fontSize: '11px', color: QUOTATION_COLORS.textMuted }}>USD</span>
+                        </div>
+
+                        {/* Total Certification Costs Display */}
+                        {((item.certificationCost || 0) + (item.labTestCost || 0)) > 0 && (
+                            <div style={{
+                                padding: '4px 8px',
+                                background: `${QUOTATION_COLORS.primary}10`,
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: '600',
+                                color: QUOTATION_COLORS.primary,
+                                textAlign: 'right'
+                            }}>
+                                Total: ${((item.certificationCost || 0) + (item.labTestCost || 0)).toFixed(2)}
+                            </div>
+                        )}
+                    </div>
+                </td>
+            )}
 
             {/* Remove Button */}
             <td style={{ padding: '12px 8px', width: '60px', textAlign: 'center' }}>

@@ -12,8 +12,12 @@ export const generateQuotationHTML = (data) => {
         totalUSD,
         companyInfo,
         showPictureColumn = true,
+        showCertificationColumn = false,
         customBlocks = [],
-        quantityUnit = 'pcs'
+        quantityUnit = 'pcs',
+        totalCertificationCost = 0,
+        totalLabTestCost = 0,
+        totalCertLabCost = 0
     } = data;
 
     const formattedDate = new Date(date).toLocaleDateString('en-GB', {
@@ -168,8 +172,32 @@ export const generateQuotationHTML = (data) => {
             object-fit: contain;
         }
 
+        .cert-cell {
+            font-size: 10px;
+            text-align: left;
+            padding: 8px;
+            vertical-align: top;
+        }
+
+        .cert-type {
+            font-weight: bold;
+            color: ${QUOTATION_COLORS.primary};
+            margin-bottom: 4px;
+        }
+
+        .cert-detail {
+            color: #555;
+            margin: 2px 0;
+        }
+
         .total-row {
             background: ${QUOTATION_COLORS.primary};
+            color: white;
+            font-weight: bold;
+        }
+
+        .grand-total-row {
+            background: ${QUOTATION_COLORS.secondary};
             color: white;
             font-weight: bold;
         }
@@ -258,10 +286,15 @@ export const generateQuotationHTML = (data) => {
                     <th>Qty (${quantityUnit})</th>
                     <th>Price (USD)</th>
                     <th>Total (USD)</th>
+                    ${showCertificationColumn ? '<th>Cert/Lab Costs</th>' : ''}
                 </tr>
             </thead>
             <tbody>
-                ${items.map((item, index) => `
+                ${items.map((item, index) => {
+                    const certCost = item.certificationCost || 0;
+                    const labCost = item.labTestCost || 0;
+                    const totalItemCert = certCost + labCost;
+                    return `
                     <tr>
                         <td>${index + 1}</td>
                         ${showPictureColumn ? `<td>${item.image ? `<img src="${item.image}" class="item-image" alt="Product">` : ''}</td>` : ''}
@@ -269,12 +302,29 @@ export const generateQuotationHTML = (data) => {
                         <td>${item.quantity}</td>
                         <td>$${item.price.toFixed(2)}</td>
                         <td>$${(item.quantity * item.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        ${showCertificationColumn ? `
+                        <td class="cert-cell">
+                            ${totalItemCert > 0 ? `
+                                ${item.certificationType ? `<div class="cert-type">${item.certificationType}</div>` : ''}
+                                ${certCost > 0 ? `<div class="cert-detail">Cert: $${certCost.toFixed(2)}</div>` : ''}
+                                ${labCost > 0 ? `<div class="cert-detail">Lab: $${labCost.toFixed(2)}</div>` : ''}
+                                <div class="cert-detail" style="font-weight: bold; margin-top: 4px;">Total: $${totalItemCert.toFixed(2)}</div>
+                            ` : ''}
+                        </td>
+                        ` : ''}
                     </tr>
-                `).join('')}
+                `}).join('')}
                 <tr class="total-row">
-                    <td colspan="${showPictureColumn ? '5' : '4'}">Total</td>
+                    <td colspan="${showPictureColumn ? '5' : '4'}">${showCertificationColumn && totalCertLabCost > 0 ? 'Product Total' : 'Total'}</td>
                     <td>$${totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    ${showCertificationColumn ? `<td>${totalCertLabCost > 0 ? '$' + totalCertLabCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}</td>` : ''}
                 </tr>
+                ${showCertificationColumn && totalCertLabCost > 0 ? `
+                <tr class="grand-total-row">
+                    <td colspan="${showPictureColumn ? '5' : '4'}">Grand Total (Products + Cert/Lab)</td>
+                    <td colspan="2">$${(totalUSD + totalCertLabCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                </tr>
+                ` : ''}
             </tbody>
         </table>
 
