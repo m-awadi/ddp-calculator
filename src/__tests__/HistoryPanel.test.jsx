@@ -160,28 +160,27 @@ describe('HistoryPanel', () => {
     });
 
     describe('delete functionality', () => {
-        test('should call onDelete when delete button clicked and confirmed', async () => {
+        test('should call onDelete when delete button clicked', async () => {
             const user = userEvent.setup();
-            window.confirm = vi.fn(() => true);
 
             render(<HistoryPanel {...defaultProps} />);
 
             const deleteButtons = screen.getAllByTitle('Delete this quotation');
             await user.click(deleteButtons[0]);
 
+            // HistoryPanel directly calls onDelete - confirm is handled by parent
             expect(defaultProps.onDelete).toHaveBeenCalledWith('test-1');
         });
 
-        test('should not call onDelete when delete cancelled', async () => {
+        test('should call onDelete with correct id for second item', async () => {
             const user = userEvent.setup();
-            window.confirm = vi.fn(() => false);
 
             render(<HistoryPanel {...defaultProps} />);
 
             const deleteButtons = screen.getAllByTitle('Delete this quotation');
-            await user.click(deleteButtons[0]);
+            await user.click(deleteButtons[1]);
 
-            expect(defaultProps.onDelete).not.toHaveBeenCalled();
+            expect(defaultProps.onDelete).toHaveBeenCalledWith('test-2');
         });
     });
 
