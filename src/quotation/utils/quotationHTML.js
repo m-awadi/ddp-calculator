@@ -17,7 +17,9 @@ export const generateQuotationHTML = (data) => {
         quantityUnit = 'pcs',
         totalCertificationCost = 0,
         totalLabTestCost = 0,
-        totalCertLabCost = 0
+        totalCertLabCost = 0,
+        totalOneTimeCost = 0,
+        totalAddonsCost = 0
     } = data;
 
     const formattedDate = new Date(date).toLocaleDateString('en-GB', {
@@ -291,9 +293,11 @@ export const generateQuotationHTML = (data) => {
             </thead>
             <tbody>
                 ${items.map((item, index) => {
-                    const certCost = item.certificationCost || 0;
-                    const labCost = item.labTestCost || 0;
-                    const totalItemCert = certCost + labCost;
+                    const certCost = parseFloat(item.certificationCost) || 0;
+                    const labCost = parseFloat(item.labTestCost) || 0;
+                    const oneTimeCost = parseFloat(item.oneTimeCost) || 0;
+                    const totalItemAddons = certCost + labCost + oneTimeCost;
+                    const oneTimeDesc = item.oneTimeCostDescription || 'One-Time';
                     return `
                     <tr>
                         <td>${index + 1}</td>
@@ -304,25 +308,26 @@ export const generateQuotationHTML = (data) => {
                         <td>$${(item.quantity * item.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         ${showCertificationColumn ? `
                         <td class="cert-cell">
-                            ${totalItemCert > 0 ? `
+                            ${totalItemAddons > 0 ? `
                                 ${item.certificationType ? `<div class="cert-type">${item.certificationType}</div>` : ''}
                                 ${certCost > 0 ? `<div class="cert-detail">Cert: $${certCost.toFixed(2)}</div>` : ''}
                                 ${labCost > 0 ? `<div class="cert-detail">Lab: $${labCost.toFixed(2)}</div>` : ''}
-                                <div class="cert-detail" style="font-weight: bold; margin-top: 4px;">Total: $${totalItemCert.toFixed(2)}</div>
+                                ${oneTimeCost > 0 ? `<div class="cert-detail">${oneTimeDesc}: $${oneTimeCost.toFixed(2)}</div>` : ''}
+                                <div class="cert-detail" style="font-weight: bold; margin-top: 4px;">Total: $${totalItemAddons.toFixed(2)}</div>
                             ` : ''}
                         </td>
                         ` : ''}
                     </tr>
                 `}).join('')}
                 <tr class="total-row">
-                    <td colspan="${showPictureColumn ? '5' : '4'}">${showCertificationColumn && totalCertLabCost > 0 ? 'Product Total' : 'Total'}</td>
+                    <td colspan="${showPictureColumn ? '5' : '4'}">${totalAddonsCost > 0 ? 'Product Total' : 'Total'}</td>
                     <td>$${totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    ${showCertificationColumn ? `<td>${totalCertLabCost > 0 ? '$' + totalCertLabCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}</td>` : ''}
+                    ${showCertificationColumn ? `<td>${totalAddonsCost > 0 ? '$' + totalAddonsCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}</td>` : ''}
                 </tr>
-                ${showCertificationColumn && totalCertLabCost > 0 ? `
+                ${totalAddonsCost > 0 ? `
                 <tr class="grand-total-row">
-                    <td colspan="${showPictureColumn ? '5' : '4'}">Grand Total (Products + Cert/Lab)</td>
-                    <td colspan="2">$${(totalUSD + totalCertLabCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td colspan="${showPictureColumn ? (showCertificationColumn ? '6' : '5') : (showCertificationColumn ? '5' : '4')}">Grand Total (Products + Add-ons)</td>
+                    <td colspan="${showCertificationColumn ? '2' : '1'}">$${(totalUSD + totalAddonsCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 </tr>
                 ` : ''}
             </tbody>

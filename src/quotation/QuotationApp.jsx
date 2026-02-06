@@ -11,7 +11,7 @@ import {
 const QuotationApp = ({ initialItems = [], onClose }) => {
     const [quotationDate, setQuotationDate] = useState(new Date().toISOString().slice(0, 10));
     const [showPictureColumn, setShowPictureColumn] = useState(true);
-    const [showCertificationColumn, setShowCertificationColumn] = useState(false);
+    const [showCertificationColumn, setShowCertificationColumn] = useState(true);
     const [quantityUnit, setQuantityUnit] = useState('pcs');
     const [items, setItems] = useState(
         initialItems.length > 0
@@ -22,9 +22,11 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                 image: null,
                 certificationCost: 0,
                 labTestCost: 0,
-                certificationType: ''
+                certificationType: '',
+                oneTimeCost: 0,
+                oneTimeCostDescription: ''
             }))
-            : [{ description: '', quantity: 0, price: 0, image: null, certificationCost: 0, labTestCost: 0, certificationType: '' }]
+            : [{ description: '', quantity: 0, price: 0, image: null, certificationCost: 0, labTestCost: 0, certificationType: '', oneTimeCost: 0, oneTimeCostDescription: '' }]
     );
 
     const [companyInfo, setCompanyInfo] = useState({ ...DEFAULT_COMPANY_INFO });
@@ -50,7 +52,7 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
     };
 
     const addItem = () => {
-        setItems([...items, { description: '', quantity: 0, price: 0, image: null, certificationCost: 0, labTestCost: 0, certificationType: '' }]);
+        setItems([...items, { description: '', quantity: 0, price: 0, image: null, certificationCost: 0, labTestCost: 0, certificationType: '', oneTimeCost: 0, oneTimeCostDescription: '' }]);
     };
 
     const removeItem = (index) => {
@@ -62,10 +64,12 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
     const totalUSD = items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
     const totalQAR = totalUSD * 3.65; // Keep for backward compatibility
 
-    // Calculate total certification and lab test costs across all items
-    const totalCertificationCost = items.reduce((sum, item) => sum + (item.certificationCost || 0), 0);
-    const totalLabTestCost = items.reduce((sum, item) => sum + (item.labTestCost || 0), 0);
+    // Calculate total certification, lab test, and one-time costs across all items
+    const totalCertificationCost = items.reduce((sum, item) => sum + (parseFloat(item.certificationCost) || 0), 0);
+    const totalLabTestCost = items.reduce((sum, item) => sum + (parseFloat(item.labTestCost) || 0), 0);
+    const totalOneTimeCost = items.reduce((sum, item) => sum + (parseFloat(item.oneTimeCost) || 0), 0);
     const totalCertLabCost = totalCertificationCost + totalLabTestCost;
+    const totalAddonsCost = totalCertLabCost + totalOneTimeCost;
 
     // Custom blocks management
     const addCustomBlock = () => {
@@ -184,7 +188,9 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                 quantityUnit,
                 totalCertificationCost,
                 totalLabTestCost,
-                totalCertLabCost
+                totalCertLabCost,
+                totalOneTimeCost,
+                totalAddonsCost
             });
         } catch (error) {
             console.error('Error generating PDF:', error);
@@ -206,7 +212,9 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                 quantityUnit,
                 totalCertificationCost,
                 totalLabTestCost,
-                totalCertLabCost
+                totalCertLabCost,
+                totalOneTimeCost,
+                totalAddonsCost
             });
         } catch (error) {
             console.error('Error generating print preview:', error);
@@ -430,26 +438,26 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                 {/* Total Row */}
                                 <tr style={{ background: QUOTATION_COLORS.primary }}>
                                     <td colSpan={showPictureColumn ? "5" : "4"} style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '14px', fontWeight: '700', textAlign: 'right' }}>
-                                        Product Total
+                                        {totalAddonsCost > 0 ? 'Product Total' : 'Total'}
                                     </td>
                                     <td style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '14px', fontWeight: '700', textAlign: 'right' }}>
                                         ${totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                     {showCertificationColumn && (
                                         <td style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '14px', fontWeight: '700', textAlign: 'right' }}>
-                                            ${totalCertLabCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            ${totalAddonsCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
                                     )}
                                     <td></td>
                                 </tr>
-                                {/* Grand Total Row (when certification column shown) */}
-                                {showCertificationColumn && totalCertLabCost > 0 && (
+                                {/* Grand Total Row (ALWAYS shown when there are add-on costs) */}
+                                {totalAddonsCost > 0 && (
                                     <tr style={{ background: QUOTATION_COLORS.secondary }}>
-                                        <td colSpan={showPictureColumn ? "5" : "4"} style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '14px', fontWeight: '700', textAlign: 'right' }}>
-                                            Grand Total (Products + Cert/Lab)
+                                        <td colSpan={showPictureColumn ? (showCertificationColumn ? "6" : "5") : (showCertificationColumn ? "5" : "4")} style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '14px', fontWeight: '700', textAlign: 'right' }}>
+                                            Grand Total (Products + Add-ons)
                                         </td>
-                                        <td colSpan="2" style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '14px', fontWeight: '700', textAlign: 'right' }}>
-                                            ${(totalUSD + totalCertLabCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        <td colSpan={showCertificationColumn ? "2" : "1"} style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '14px', fontWeight: '700', textAlign: 'right' }}>
+                                            ${(totalUSD + totalAddonsCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
                                         <td></td>
                                     </tr>

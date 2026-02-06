@@ -398,8 +398,56 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                             <span style={{ fontSize: '11px', color: QUOTATION_COLORS.textMuted }}>USD</span>
                         </div>
 
-                        {/* Total Certification Costs Display */}
-                        {((item.certificationCost || 0) + (item.labTestCost || 0)) > 0 && (
+                        {/* One-Time Cost Input (fixed cost per item, not per pcs) */}
+                        <div style={{
+                            marginTop: '8px',
+                            paddingTop: '8px',
+                            borderTop: `1px dashed ${QUOTATION_COLORS.textMuted}40`
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                <label style={{
+                                    fontSize: '11px',
+                                    color: QUOTATION_COLORS.textMuted,
+                                    minWidth: '60px'
+                                }}>
+                                    One-Time:
+                                </label>
+                                <input
+                                    type="number"
+                                    value={item.oneTimeCost || ''}
+                                    onChange={(e) => onUpdate(index, 'oneTimeCost', parseFloat(e.target.value) || 0)}
+                                    placeholder="0.00"
+                                    min="0"
+                                    step="0.01"
+                                    style={{
+                                        flex: 1,
+                                        padding: '6px 8px',
+                                        border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                        borderRadius: '4px',
+                                        fontSize: '12px',
+                                        textAlign: 'right'
+                                    }}
+                                />
+                                <span style={{ fontSize: '11px', color: QUOTATION_COLORS.textMuted }}>USD</span>
+                            </div>
+                            <input
+                                type="text"
+                                value={item.oneTimeCostDescription || ''}
+                                onChange={(e) => onUpdate(index, 'oneTimeCostDescription', e.target.value)}
+                                placeholder="Description (e.g., Cylinder Cost)"
+                                style={{
+                                    width: '100%',
+                                    padding: '4px 8px',
+                                    border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                    borderRadius: '4px',
+                                    fontSize: '11px',
+                                    color: QUOTATION_COLORS.textMuted
+                                }}
+                            />
+                        </div>
+
+                        {/* Total Add-ons Costs Display */}
+                        {((item.certificationCost || 0) + (item.labTestCost || 0) + (item.oneTimeCost || 0)) > 0 && (
                             <div style={{
                                 padding: '4px 8px',
                                 background: `${QUOTATION_COLORS.primary}10`,
@@ -407,9 +455,10 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                                 fontSize: '11px',
                                 fontWeight: '600',
                                 color: QUOTATION_COLORS.primary,
-                                textAlign: 'right'
+                                textAlign: 'right',
+                                marginTop: '8px'
                             }}>
-                                Total: ${((item.certificationCost || 0) + (item.labTestCost || 0)).toFixed(2)}
+                                Total Add-ons: ${((item.certificationCost || 0) + (item.labTestCost || 0) + (item.oneTimeCost || 0)).toFixed(2)}
                             </div>
                         )}
                     </div>

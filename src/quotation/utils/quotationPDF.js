@@ -36,7 +36,9 @@ export const generateQuotationPDF = async (data) => {
         quantityUnit = 'pcs',
         totalCertificationCost = 0,
         totalLabTestCost = 0,
-        totalCertLabCost = 0
+        totalCertLabCost = 0,
+        totalOneTimeCost = 0,
+        totalAddonsCost = 0
     } = data;
 
     const doc = new jsPDF();
@@ -135,11 +137,12 @@ export const generateQuotationPDF = async (data) => {
         );
         // Add certification column if enabled
         if (showCertificationColumn) {
-            const certCost = item.certificationCost || 0;
-            const labCost = item.labTestCost || 0;
-            const totalItemCert = certCost + labCost;
+            const certCost = parseFloat(item.certificationCost) || 0;
+            const labCost = parseFloat(item.labTestCost) || 0;
+            const oneTimeCost = parseFloat(item.oneTimeCost) || 0;
+            const totalItemAddons = certCost + labCost + oneTimeCost;
             let certText = '';
-            if (totalItemCert > 0) {
+            if (totalItemAddons > 0) {
                 const parts = [];
                 if (item.certificationType) {
                     parts.push(item.certificationType);
@@ -149,6 +152,10 @@ export const generateQuotationPDF = async (data) => {
                 }
                 if (labCost > 0) {
                     parts.push(`Lab: $${labCost.toFixed(2)}`);
+                }
+                if (oneTimeCost > 0) {
+                    const desc = item.oneTimeCostDescription || 'One-Time';
+                    parts.push(`${desc}: $${oneTimeCost.toFixed(2)}`);
                 }
                 certText = parts.join('\n');
             }
@@ -163,7 +170,7 @@ export const generateQuotationPDF = async (data) => {
     // Add total row
     const totalRowData = [];
     totalRowData.push({
-        content: showCertificationColumn && totalCertLabCost > 0 ? 'Product Total' : 'Total',
+        content: totalAddonsCost > 0 ? 'Product Total' : 'Total',
         colSpan: baseColSpan,
         styles: {
             fillColor: [primaryRGB.r, primaryRGB.g, primaryRGB.b],
@@ -184,7 +191,7 @@ export const generateQuotationPDF = async (data) => {
     // Add certification total column if enabled
     if (showCertificationColumn) {
         totalRowData.push({
-            content: totalCertLabCost > 0 ? '$' + totalCertLabCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '',
+            content: totalAddonsCost > 0 ? '$' + totalAddonsCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '',
             styles: {
                 fillColor: [primaryRGB.r, primaryRGB.g, primaryRGB.b],
                 textColor: [255, 255, 255],
@@ -195,11 +202,11 @@ export const generateQuotationPDF = async (data) => {
     }
     tableData.push(totalRowData);
 
-    // Add grand total row if certification costs exist
-    if (showCertificationColumn && totalCertLabCost > 0) {
+    // Add grand total row if add-on costs exist (ALWAYS shown when there are add-ons)
+    if (totalAddonsCost > 0) {
         const grandTotalRow = [];
         grandTotalRow.push({
-            content: 'Grand Total (Products + Cert/Lab)',
+            content: 'Grand Total (Products + Add-ons)',
             colSpan: baseColSpan,
             styles: {
                 fillColor: [secondaryRGB.r, secondaryRGB.g, secondaryRGB.b],
@@ -209,8 +216,8 @@ export const generateQuotationPDF = async (data) => {
             }
         });
         grandTotalRow.push({
-            content: '$' + (totalUSD + totalCertLabCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-            colSpan: 2,
+            content: '$' + (totalUSD + totalAddonsCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            colSpan: showCertificationColumn ? 2 : 1,
             styles: {
                 fillColor: [secondaryRGB.r, secondaryRGB.g, secondaryRGB.b],
                 textColor: [255, 255, 255],
