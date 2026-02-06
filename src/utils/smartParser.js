@@ -18,9 +18,15 @@ DATE EXTRACTION RULES:
 - Detect Incoterms (EXW, FOB, or CIF). If not explicit, infer from context (e.g. "Ex-works", "FOB Shenzhen", "CIF Doha"). Default to EXW if unsure.
 
 **MULTI-LINE DESCRIPTIONS**:
-- **CRITICAL**: Preserve line breaks in item descriptions! If a description spans multiple lines or contains specifications on separate lines, include newline characters (\\n) in the description string.
-- Example: "Product Name\\nModel: ABC-123\\nColor: Red" - this preserves the multi-line format.
+- **CRITICAL**: Preserve ALL line breaks in item descriptions! If a description spans multiple lines or contains specifications on separate lines, include newline characters (\\n) in the description string.
+- Example: "Product Name\\nModel: ABC-123\\nColor: Red\\nSize: Large" - this preserves the multi-line format.
 - Do NOT flatten multi-line descriptions into a single line.
+- Common multi-line patterns to preserve:
+  - Product name on first line, specifications below
+  - Model numbers, colors, sizes on separate lines
+  - Technical specs like dimensions, materials, certifications
+  - Any text that appears on separate visual lines in the source document
+- If the source has bullet points or numbered lists within a description, convert them to separate lines with \\n.
 
 OUTPUT FORMAT:
 You must output PURE JSON matching this schema exactly:
