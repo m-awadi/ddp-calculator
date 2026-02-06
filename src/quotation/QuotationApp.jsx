@@ -8,6 +8,21 @@ import {
     QUOTATION_COLORS
 } from './utils/defaultTerms';
 
+/**
+ * @typedef {Object} InitialQuotationItem
+ * @property {string} [description]
+ * @property {number} [quantity]
+ * @property {string} [unitType]
+ * @property {number} [ddpPerUnit]
+ * @property {number} [price]
+ */
+
+/**
+ * @param {{
+ *   initialItems?: InitialQuotationItem[];
+ *   onClose?: () => void;
+ * }} props
+ */
 const QuotationApp = ({ initialItems = [], onClose }) => {
     const [quotationDate, setQuotationDate] = useState(new Date().toISOString().slice(0, 10));
     const [showPictureColumn, setShowPictureColumn] = useState(true);

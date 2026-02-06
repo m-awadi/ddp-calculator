@@ -1,4 +1,33 @@
-const Input = ({ label, type = 'text', value, onChange, prefix, suffix, hint, step, placeholder, min }) => {
+/**
+ * @param {{
+ *  label?: string;
+ *  type?: string;
+ *  value: string | number;
+ *  onChange: (value: string) => void;
+ *  prefix?: string;
+ *  suffix?: string;
+ *  hint?: string;
+ *  step?: string;
+ *  placeholder?: string;
+ *  min?: string | number;
+ *  inputMode?: string;
+ *  pattern?: string;
+ * }} props
+ */
+const Input = ({
+    label = '',
+    type = 'text',
+    value,
+    onChange,
+    prefix,
+    suffix,
+    hint,
+    step,
+    placeholder = '',
+    min,
+    inputMode,
+    pattern,
+}) => {
     // Generate a unique ID for the input
     const inputId = label ? `input-${label.replace(/\s+/g, '-').toLowerCase()}` : undefined;
 
@@ -39,6 +68,8 @@ const Input = ({ label, type = 'text', value, onChange, prefix, suffix, hint, st
                     placeholder={placeholder}
                     step={step}
                     min={min}
+                    inputMode={inputMode}
+                    pattern={pattern}
                     style={{
                         width: '100%',
                         padding: prefix ? '10px 12px 10px 32px' : suffix ? '10px 32px 10px 12px' : '10px 12px',

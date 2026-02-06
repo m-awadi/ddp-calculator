@@ -1,4 +1,5 @@
 import { CONTAINER_SPECS, DEFAULT_RATES, MOFA_FEE_TIERS, CERTIFICATE_OF_ORIGIN_FEE } from './constants.js';
+import { parseNumberInput } from './numberParsing.js';
 
 /**
  * Calculate MOFA attestation fees based on tiered structure
@@ -174,7 +175,16 @@ const performDDPCalculation = (inputItems, settings, overrides) => {
     if (!inputItems.length) return null;
 
     // Use a deep copy of items to prevent state mutation, which is a common cause of loops
-    const items = JSON.parse(JSON.stringify(inputItems));
+    // Also normalize numeric fields using parseNumberInput to handle international formats
+    const items = JSON.parse(JSON.stringify(inputItems)).map((item) => ({
+        ...item,
+        quantity: parseNumberInput(item.quantity),
+        unitPrice: parseNumberInput(item.unitPrice ?? item.exwPrice),
+        exwPrice: parseNumberInput(item.unitPrice ?? item.exwPrice),
+        cbmPerUnit: parseNumberInput(item.cbmPerUnit),
+        weightPerUnit: parseNumberInput(item.weightPerUnit),
+        certifications: Array.isArray(item.certifications) ? item.certifications : [],
+    }));
 
     const rates = { ...DEFAULT_RATES, ...overrides };
     const profitMarginSetting = settings.profitMargin ?? DEFAULT_RATES.profitMargin;
@@ -195,7 +205,7 @@ const performDDPCalculation = (inputItems, settings, overrides) => {
         totalWeight += (item.weightPerUnit || 0) * item.quantity;
         if (item.certifications && Array.isArray(item.certifications)) {
             item.certifications.forEach(cert => {
-                totalCertificationCost += parseFloat(cert.cost) || 0;
+                totalCertificationCost += parseNumberInput(cert.cost);
             });
         }
     });
@@ -290,7 +300,7 @@ const performDDPCalculation = (inputItems, settings, overrides) => {
         const cbmRatio = totalCbm > 0 ? itemCbm / totalCbm : 0;
 
         // Calculate item-specific certification cost
-        const itemCertificationCost = (item.certifications || []).reduce((sum, cert) => sum + (parseFloat(cert.cost) || 0), 0);
+        const itemCertificationCost = (item.certifications || []).reduce((sum, cert) => sum + parseNumberInput(cert.cost), 0);
 
         // Allocate costs (pro-rate base certification, but add item-specific certs directly)
         const allocatedFreight = freightSubtotal * cbmRatio;
@@ -410,8 +420,8 @@ export const calculateDDP = (inputItems, settings, overrides = {}) => {
     // If input is different, perform the full calculation.
     const result = performDDPCalculation(inputItems, settings, overrides);
 
-    // Cache the new input and result for the next call.
-    lastInput = currentInput;
+    // Cache a deep copy to avoid mutation-based staleness.
+    lastInput = JSON.parse(JSON.stringify(currentInput));
     lastResult = result;
 
     return result;

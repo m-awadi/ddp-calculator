@@ -3,6 +3,16 @@ import CostRow from './CostRow';
 import { formatCurrency, formatNumber } from '../utils/formatters';
 import { generatePDFReport } from '../utils/modernReportGenerator';
 
+/**
+ * @param {{
+ *  results: any;
+ *  items: any[];
+ *  settings: any;
+ *  previewResults?: any;
+ *  customsPreviewEnabled?: boolean;
+ *  reportName?: string;
+ * }} props
+ */
 const ResultsPanel = ({ results, items, settings, previewResults = null, customsPreviewEnabled = false, reportName = '' }) => {
     if (!results) return null;
 
@@ -31,25 +41,30 @@ const ResultsPanel = ({ results, items, settings, previewResults = null, customs
             unitType: item.unitType,
             ddpPerUnit: item.ddpPerUnit
         }));
-        sessionStorage.setItem('quotationItems', JSON.stringify(quotationItems));
-        // Use relative path to stay within the same directory/route
-        // Robustly determine the correct path for quotation.html
-        // This handles cases where the user might be at /ddp-calculator (no slash)
-        // caused by missing server redirects or caching issues.
-        let currentPath = window.location.pathname;
+        const payload = JSON.stringify(quotationItems);
+        sessionStorage.setItem('quotationItems', payload);
+        localStorage.setItem('quotationItems', payload);
 
-        // Remove 'index.html' if present
-        if (currentPath.endsWith('index.html')) {
-            currentPath = currentPath.substring(0, currentPath.lastIndexOf('/'));
+        // Detect if running in Next.js context (path contains /internal/ddp-calculator)
+        // or standalone Vite context (path is /ddp-calculator/)
+        const currentPath = window.location.pathname;
+        const isNextJsContext = currentPath.includes('/internal/ddp-calculator');
+
+        if (isNextJsContext) {
+            // Next.js routing - extract locale and use Next.js route
+            const locale = currentPath.split('/')[1] || 'en';
+            window.open(`/${locale}/internal/ddp-calculator/quotation`, '_blank');
+        } else {
+            // Standalone Vite context - use relative path to quotation.html
+            let basePath = currentPath;
+            if (basePath.endsWith('index.html')) {
+                basePath = basePath.substring(0, basePath.lastIndexOf('/'));
+            }
+            if (!basePath.endsWith('/')) {
+                basePath += '/';
+            }
+            window.open(`${basePath}quotation.html`, '_blank');
         }
-
-        // Ensure trailing slash
-        if (!currentPath.endsWith('/')) {
-            currentPath += '/';
-        }
-
-        // Open quotation.html relative to the computed directory base
-        window.open(`${currentPath}quotation.html`, '_blank');
     };
 
     return (
@@ -76,7 +91,7 @@ const ResultsPanel = ({ results, items, settings, previewResults = null, customs
                     <div>
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Utilization</p>
                         <p style={{ fontSize: '20px', fontWeight: '700', color: summary.containerUtilization > 80 ? 'var(--accent-emerald)' : 'var(--accent-amber)' }}>
-                            {formatNumber(summary.containerUtilization, 2)}%
+                            {formatNumber(summary.containerUtilization, 1)}%
                         </p>
                     </div>
                 </div>
