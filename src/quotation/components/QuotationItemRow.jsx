@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { QUOTATION_COLORS } from '../utils/defaultTerms';
+import { detectTextDirection } from '../utils/bidiUtils';
 
 // Common certification types for dropdown
 const CERTIFICATION_TYPES = [
@@ -378,6 +379,7 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                     value={item.description}
                     onChange={(e) => onUpdate(index, 'description', e.target.value)}
                     placeholder="Product description..."
+                    dir={detectTextDirection(item.description)}
                     style={{
                         width: '100%',
                         minHeight: '80px',
@@ -388,7 +390,9 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                         fontFamily: 'inherit',
                         resize: 'vertical',
                         backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
-                        color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark
+                        color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark,
+                        unicodeBidi: 'plaintext',
+                        textAlign: detectTextDirection(item.description) === 'rtl' ? 'right' : 'left'
                     }}
                 />
             </td>

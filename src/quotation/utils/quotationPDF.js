@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { QUOTATION_COLORS } from './defaultTerms';
-import { preserveArabicText } from './arabicText';
+import { preserveArabicText, detectTextDirection, processTextForPDF } from './arabicText';
 
 // Helper to convert image URL to base64
 const loadImageAsBase64 = async (url) => {
@@ -32,6 +32,7 @@ export const generateQuotationPDF = async (data) => {
         companyInfo,
         showPictureColumn = true,
         showCertificationColumn = false,
+        extraColumnLabel = 'Extra',
         customBlocks = [],
         quantityUnit = 'pcs',
         totalCertificationCost = 0,
@@ -141,8 +142,10 @@ export const generateQuotationPDF = async (data) => {
         if (showPictureColumn) {
             row.push(''); // Image placeholder
         }
+        // Process description with bidi handling for mixed Arabic/English text
+        const processedDescription = processTextForPDF(item.description || '');
         row.push(
-            item.description || '',
+            processedDescription,
             item.quantity.toString(),
             formatCurrency(item.price),
             formatCurrency(item.quantity * item.price)
@@ -247,7 +250,7 @@ export const generateQuotationPDF = async (data) => {
     }
     tableHeader.push('Description', `Qty (${quantityUnit})`, 'Price (USD)', 'Total (USD)');
     if (showCertificationColumn) {
-        tableHeader.push('Extra');
+        tableHeader.push(extraColumnLabel);
     }
 
     // Build column styles
@@ -267,7 +270,7 @@ export const generateQuotationPDF = async (data) => {
     columnStyles[colIndex++] = { cellWidth: 22, halign: 'right' }; // Price
     columnStyles[colIndex++] = { cellWidth: 28, halign: 'right' }; // Total
     if (showCertificationColumn) {
-        columnStyles[colIndex++] = { cellWidth: 35, halign: 'left', overflow: 'linebreak' }; // Extra
+        columnStyles[colIndex++] = { cellWidth: 35, halign: 'left', overflow: 'linebreak' }; // Extra column (dynamic label)
     }
 
     autoTable(doc, {

@@ -7,6 +7,7 @@ import {
     DEFAULT_CUSTOM_BLOCKS,
     QUOTATION_COLORS
 } from './utils/defaultTerms';
+import { detectTextDirection } from './utils/bidiUtils';
 
 /**
  * @typedef {Object} InitialQuotationItem
@@ -27,6 +28,7 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
     const [quotationDate, setQuotationDate] = useState(new Date().toISOString().slice(0, 10));
     const [showPictureColumn, setShowPictureColumn] = useState(true);
     const [showCertificationColumn, setShowCertificationColumn] = useState(true);
+    const [extraColumnLabel, setExtraColumnLabel] = useState('Extra');
     const [showQAR, setShowQAR] = useState(false);
     const [qarExchangeRate, setQarExchangeRate] = useState(3.65);
     const [quantityUnit, setQuantityUnit] = useState('pcs');
@@ -263,6 +265,7 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                 companyInfo,
                 showPictureColumn,
                 showCertificationColumn,
+                extraColumnLabel,
                 customBlocks,
                 quantityUnit,
                 totalCertificationCost,
@@ -289,6 +292,7 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                 companyInfo,
                 showPictureColumn,
                 showCertificationColumn,
+                extraColumnLabel,
                 customBlocks,
                 quantityUnit,
                 totalCertificationCost,
@@ -499,8 +503,28 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                         onChange={(e) => setShowCertificationColumn(e.target.checked)}
                                         style={{ cursor: 'pointer' }}
                                     />
-                                    Show Extra Costs
+                                    Show Extra Column
                                 </label>
+                                {showCertificationColumn && (
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: QUOTATION_COLORS.textDark }}>
+                                        <span>Label:</span>
+                                        <input
+                                            type="text"
+                                            value={extraColumnLabel}
+                                            onChange={(e) => setExtraColumnLabel(e.target.value || 'Extra')}
+                                            placeholder="Extra"
+                                            style={{
+                                                width: '100px',
+                                                padding: '6px 8px',
+                                                border: `1px solid ${QUOTATION_COLORS.inputBorder || QUOTATION_COLORS.textMuted}40`,
+                                                borderRadius: '4px',
+                                                fontSize: '13px',
+                                                backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
+                                                color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark
+                                            }}
+                                        />
+                                    </label>
+                                )}
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: QUOTATION_COLORS.textDark, cursor: 'pointer' }}>
                                     <input
                                         type="checkbox"
@@ -542,7 +566,7 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                     <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}>Qty ({quantityUnit})</th>
                                     <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}>Price (USD)</th>
                                     <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}>Total (USD)</th>
-                                    {showCertificationColumn && <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}>Extra</th>}
+                                    {showCertificationColumn && <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}>{extraColumnLabel}</th>}
                                     <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}></th>
                                 </tr>
                             </thead>
@@ -658,6 +682,7 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                         value={block.title}
                                         onChange={(e) => updateBlockTitle(blockIdx, e.target.value)}
                                         placeholder="Block Title (e.g., معلومات خاصة بالعرض:)"
+                                        dir={detectTextDirection(block.title)}
                                         style={{
                                             flex: 1,
                                             padding: '10px',
@@ -666,7 +691,9 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                             fontSize: '14px',
                                             fontWeight: '600',
                                             color: QUOTATION_COLORS.primary,
-                                            backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white
+                                            backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
+                                            unicodeBidi: 'plaintext',
+                                            textAlign: detectTextDirection(block.title) === 'rtl' ? 'right' : 'left'
                                         }}
                                     />
                                     <button
@@ -737,6 +764,7 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                                 value={section.title}
                                                 onChange={(e) => updateSectionTitle(blockIdx, sectionIdx, e.target.value)}
                                                 placeholder="Section Title (e.g., التسليم:)"
+                                                dir={detectTextDirection(section.title)}
                                                 style={{
                                                     flex: 1,
                                                     padding: '8px',
@@ -745,7 +773,9 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                                     fontSize: '13px',
                                                     fontWeight: '600',
                                                     backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
-                                                    color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark
+                                                    color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark,
+                                                    unicodeBidi: 'plaintext',
+                                                    textAlign: detectTextDirection(section.title) === 'rtl' ? 'right' : 'left'
                                                 }}
                                             />
                                             <button
@@ -807,6 +837,7 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                                     onChange={(e) => updateBlockItem(blockIdx, sectionIdx, itemIdx, e.target.value)}
                                                     placeholder="Sub-item text..."
                                                     rows="2"
+                                                    dir={detectTextDirection(item)}
                                                     style={{
                                                         flex: 1,
                                                         padding: '6px',
@@ -816,7 +847,9 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                                         fontFamily: 'inherit',
                                                         resize: 'vertical',
                                                         backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
-                                                        color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark
+                                                        color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark,
+                                                        unicodeBidi: 'plaintext',
+                                                        textAlign: detectTextDirection(item) === 'rtl' ? 'right' : 'left'
                                                     }}
                                                 />
                                                 <button

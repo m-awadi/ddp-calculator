@@ -1,4 +1,5 @@
 import { QUOTATION_COLORS } from './defaultTerms';
+import { detectTextDirection, escapeHtml, BIDI_CSS } from './bidiUtils';
 
 /**
  * Generate HTML version of quotation for perfect Arabic support
@@ -13,6 +14,7 @@ export const generateQuotationHTML = (data) => {
         companyInfo,
         showPictureColumn = true,
         showCertificationColumn = false,
+        extraColumnLabel = 'Extra',
         customBlocks = [],
         quantityUnit = 'pcs',
         totalCertificationCost = 0,
@@ -177,13 +179,34 @@ export const generateQuotationHTML = (data) => {
         }
 
         td.description {
-            text-align: left;
-            direction: ltr;
             font-weight: bold;
             word-wrap: break-word;
             overflow-wrap: break-word;
             max-width: 200px; /* Prevent description from taking too much space */
             white-space: pre-wrap; /* Preserve line breaks and wrap text */
+            /* Bidirectional text support - direction set per cell */
+        }
+
+        /* Bidirectional text support */
+        .bidi-text {
+            unicode-bidi: isolate;
+        }
+
+        .bidi-rtl {
+            direction: rtl;
+            text-align: right;
+            unicode-bidi: isolate;
+        }
+
+        .bidi-ltr {
+            direction: ltr;
+            text-align: left;
+            unicode-bidi: isolate;
+        }
+
+        /* For mixed RTL/LTR content - auto-detect direction */
+        [dir="auto"] {
+            unicode-bidi: isolate;
         }
 
         .item-image {
@@ -371,7 +394,7 @@ export const generateQuotationHTML = (data) => {
                     <th>Qty (${quantityUnit})</th>
                     <th>Price (USD)</th>
                     <th>Total (USD)</th>
-                    ${showCertificationColumn ? '<th>Extra</th>' : ''}
+                    ${showCertificationColumn ? `<th>${extraColumnLabel}</th>` : ''}
                 </tr>
             </thead>
             <tbody>
@@ -383,23 +406,25 @@ export const generateQuotationHTML = (data) => {
                     const oneTimeDesc = item.oneTimeCostDescription || 'One-Time';
                     // Support both legacy single image and new multi-image array
                     const images = item.images && item.images.length > 0 ? item.images : (item.image ? [item.image] : []);
-                    // Escape HTML and preserve newlines in description
-                    const descriptionHtml = (item.description || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+                    // Escape HTML and preserve newlines in description with proper bidi handling
+                    const descriptionText = item.description || '';
+                    const descriptionDir = detectTextDirection(descriptionText);
+                    const descriptionHtml = escapeHtml(descriptionText).replace(/\n/g, '<br>');
                     return `
                     <tr>
                         <td>${index + 1}</td>
                         ${showPictureColumn ? `<td>${images.length > 0 ? `<div class="images-container">${images.map((img, imgIdx) => `<img src="${img}" class="item-image" alt="Product ${imgIdx + 1}">`).join('')}</div>` : ''}</td>` : ''}
-                        <td class="description">${descriptionHtml}</td>
+                        <td class="description" dir="${descriptionDir}" style="direction: ${descriptionDir}; text-align: ${descriptionDir === 'rtl' ? 'right' : 'left'}; unicode-bidi: isolate;">${descriptionHtml}</td>
                         <td>${item.quantity}</td>
                         <td>${formatCurrency(item.price)}</td>
                         <td>${formatCurrency(item.quantity * item.price)}</td>
                         ${showCertificationColumn ? `
                         <td class="cert-cell">
                             ${totalItemAddons > 0 ? `
-                                ${item.certificationType ? `<div class="cert-type">${item.certificationType}</div>` : ''}
+                                ${item.certificationType ? `<div class="cert-type">${escapeHtml(item.certificationType)}</div>` : ''}
                                 ${certCost > 0 ? `<div class="cert-detail">Cert: $${certCost.toFixed(2)}</div>` : ''}
                                 ${labCost > 0 ? `<div class="cert-detail">Lab: $${labCost.toFixed(2)}</div>` : ''}
-                                ${oneTimeCost > 0 ? `<div class="cert-detail">${oneTimeDesc}: $${oneTimeCost.toFixed(2)}</div>` : ''}
+                                ${oneTimeCost > 0 ? `<div class="cert-detail">${escapeHtml(oneTimeDesc)}: $${oneTimeCost.toFixed(2)}</div>` : ''}
                                 <div class="cert-detail" style="font-weight: bold; margin-top: 4px;">Total: $${totalItemAddons.toFixed(2)}</div>
                             ` : ''}
                         </td>
@@ -421,18 +446,25 @@ export const generateQuotationHTML = (data) => {
         </table>
 
         <!-- Custom Blocks (Now includes Terms & Bank Details) -->
-        ${customBlocks.map(block => `
-            <div class="terms-section" style="margin-top: 30px;">
-                <div class="terms-title">${block.title}</div>
-                ${block.sections.map(section => `
+        ${customBlocks.map(block => {
+            const blockTitleDir = detectTextDirection(block.title);
+            return `
+            <div class="terms-section" style="margin-top: 30px; direction: ${blockTitleDir}; text-align: ${blockTitleDir === 'rtl' ? 'right' : 'left'};">
+                <div class="terms-title" dir="${blockTitleDir}" style="unicode-bidi: isolate;">${escapeHtml(block.title)}</div>
+                ${block.sections.map(section => {
+                    const sectionTitleDir = detectTextDirection(section.title);
+                    return `
                     <div style="margin-top: 15px;">
-                        <strong>● ${section.title}</strong>
-                        ${section.items.map(item => `<div class="term-item">○ ${item}</div>`).join('')}
+                        <strong dir="${sectionTitleDir}" style="unicode-bidi: isolate; display: inline-block;">● ${escapeHtml(section.title)}</strong>
+                        ${section.items.map(item => {
+                            const itemDir = detectTextDirection(item);
+                            return `<div class="term-item" dir="${itemDir}" style="unicode-bidi: isolate;">○ ${escapeHtml(item)}</div>`;
+                        }).join('')}
                         ${section.image ? `<img src="${section.image}" alt="Section image" class="section-image">` : ''}
                     </div>
-                `).join('')}
+                `}).join('')}
             </div>
-        `).join('')}
+        `}).join('')}
 
         <!-- Footer - appears only on final page -->
         <img src="/footer.png" alt="Footer" class="footer-bar">
