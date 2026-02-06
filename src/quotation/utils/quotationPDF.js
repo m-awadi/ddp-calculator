@@ -95,7 +95,7 @@ export const generateQuotationPDF = async (data) => {
 
         @page {
             size: A4;
-            margin: 0;
+            margin: 15mm 10mm 20mm 10mm; /* top, right, bottom, left */
         }
 
         body {
@@ -108,15 +108,38 @@ export const generateQuotationPDF = async (data) => {
         }
 
         .page {
-            width: 210mm;
-            min-height: 297mm;
-            margin: 0 auto;
+            width: 100%;
             background: #FFFFFF;
-            position: relative;
-            page-break-after: always;
-            padding: 15mm 10mm;
-            box-shadow: none;
             color: #1B2B38;
+        }
+
+        /* Page break controls */
+        thead {
+            display: table-header-group; /* Repeat header on each page */
+        }
+
+        tr {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        /* Prevent orphaned headers - keep with next content */
+        .terms-title,
+        .terms-section > div > strong {
+            break-after: avoid;
+            page-break-after: avoid;
+        }
+
+        /* Keep sections together when possible */
+        .terms-section > div {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        /* Prevent widows and orphans in text */
+        p, .term-item {
+            orphans: 3;
+            widows: 3;
         }
 
         .header {
@@ -271,9 +294,13 @@ export const generateQuotationPDF = async (data) => {
         .terms-section {
             margin: 20px 0;
             font-family: 'Noto Sans Arabic', 'Roboto', sans-serif;
+            break-inside: avoid;
+            page-break-inside: avoid;
         }
 
         .terms-title {
+            break-after: avoid;
+            page-break-after: avoid;
             font-size: 14px;
             font-weight: bold;
             color: #D65A1F;
@@ -285,6 +312,19 @@ export const generateQuotationPDF = async (data) => {
             font-size: 12px;
             line-height: 1.8;
             color: #1B2B38;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        /* Section with title - keep title with first item */
+        .section-block {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        .section-block strong {
+            break-after: avoid;
+            page-break-after: avoid;
         }
 
         .section-image {
@@ -296,17 +336,12 @@ export const generateQuotationPDF = async (data) => {
         }
 
         .footer-bar {
-            position: absolute;
-            bottom: 0;
-            right: 0;
             max-height: 80px;
             max-width: 300px;
             object-fit: contain;
-            display: none;
-        }
-
-        .page:last-of-type .footer-bar {
             display: block;
+            margin-left: auto;
+            margin-top: 30px;
         }
 
         @media print {
@@ -317,8 +352,6 @@ export const generateQuotationPDF = async (data) => {
                 color: #1B2B38 !important;
             }
             .page {
-                margin: 0;
-                page-break-after: always;
                 background: #FFFFFF !important;
                 color: #1B2B38 !important;
             }
@@ -328,6 +361,15 @@ export const generateQuotationPDF = async (data) => {
             .total-row td,
             .grand-total-row td {
                 color: #FFFFFF !important;
+            }
+            /* Ensure table headers repeat on each page */
+            thead {
+                display: table-header-group;
+            }
+            /* Prevent rows from breaking */
+            tr {
+                break-inside: avoid;
+                page-break-inside: avoid;
             }
         }
     </style>
@@ -413,7 +455,7 @@ export const generateQuotationPDF = async (data) => {
                 ${block.sections.map(section => {
                     const sectionTitleDir = detectTextDirection(section.title);
                     return `
-                    <div style="margin-top: 15px;">
+                    <div class="section-block" style="margin-top: 15px;">
                         <strong class="${sectionTitleDir === 'rtl' ? 'bidi-rtl' : 'bidi-ltr'}" style="display: inline-block;">● ${escapeHtml(section.title)}</strong>
                         ${section.items.map(item => {
                             const itemDir = detectTextDirection(item);
