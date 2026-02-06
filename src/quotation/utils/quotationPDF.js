@@ -1,6 +1,28 @@
 import { detectTextDirection, escapeHtml } from './bidiUtils';
 
 /**
+ * Convert an image URL to base64 data URI
+ * @param {string} url - The image URL to convert
+ * @returns {Promise<string|null>} Base64 data URI or null if failed
+ */
+const imageToBase64 = async (url) => {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        const blob = await response.blob();
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+        });
+    } catch (error) {
+        console.error('Error converting image to base64:', error);
+        return null;
+    }
+};
+
+/**
  * Generate quotation PDF using server-side Puppeteer rendering
  * This provides perfect Arabic/English bidirectional text support
  */
@@ -40,6 +62,14 @@ export const generateQuotationPDF = async (data) => {
         month: 'short',
         year: 'numeric'
     });
+
+    // Load images as base64 for server-side rendering
+    // The server can't access client URLs, so we embed images directly
+    const baseUrl = window.location.origin;
+    const [logoBase64, footerBase64] = await Promise.all([
+        imageToBase64(`${baseUrl}/logo-standalone-web.png`),
+        imageToBase64(`${baseUrl}/footer.png`)
+    ]);
 
     // Generate standalone HTML with embedded fonts from Google Fonts CDN
     // Using Noto Sans Arabic for proper Arabic text support + Roboto for English
@@ -311,7 +341,7 @@ export const generateQuotationPDF = async (data) => {
                 <div class="company-details">${escapeHtml(companyInfo.email)}</div>
                 <div class="company-details">${formattedDate}</div>
             </div>
-            <img src="${window.location.origin}/logo-standalone-web.png" alt="Logo" class="logo" crossorigin="anonymous">
+            ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" class="logo">` : ''}
         </div>
 
         <div class="quotation-title">DDP Quotation</div>
@@ -395,7 +425,7 @@ export const generateQuotationPDF = async (data) => {
             </div>
         `}).join('')}
 
-        <img src="${window.location.origin}/footer.png" alt="Footer" class="footer-bar" crossorigin="anonymous">
+        ${footerBase64 ? `<img src="${footerBase64}" alt="Footer" class="footer-bar">` : ''}
     </div>
 </body>
 </html>
