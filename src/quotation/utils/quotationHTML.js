@@ -271,6 +271,14 @@ export const generateQuotationHTML = (data) => {
             color: #1B2B38;
         }
 
+        .section-image {
+            max-width: 100%;
+            max-height: 200px;
+            object-fit: contain;
+            margin: 10px 0 10px 20px;
+            border-radius: 4px;
+        }
+
         /* Bank details now handled by custom blocks, but keeping class just in case users add it manually or for legacy support */
         .bank-details {
             direction: ltr;
@@ -363,7 +371,7 @@ export const generateQuotationHTML = (data) => {
                     <th>Qty (${quantityUnit})</th>
                     <th>Price (USD)</th>
                     <th>Total (USD)</th>
-                    ${showCertificationColumn ? '<th>Cert/Lab Costs</th>' : ''}
+                    ${showCertificationColumn ? '<th>Extra</th>' : ''}
                 </tr>
             </thead>
             <tbody>
@@ -420,6 +428,7 @@ export const generateQuotationHTML = (data) => {
                     <div style="margin-top: 15px;">
                         <strong>● ${section.title}</strong>
                         ${section.items.map(item => `<div class="term-item">○ ${item}</div>`).join('')}
+                        ${section.image ? `<img src="${section.image}" alt="Section image" class="section-image">` : ''}
                     </div>
                 `).join('')}
             </div>

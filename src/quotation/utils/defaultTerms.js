@@ -35,7 +35,7 @@ export const QUOTATION_COLORS = isDarkMode ? {
 
 export const DEFAULT_COMPANY_INFO = {
     name: 'Arabian Trade Route',
-    address: 'Doha, Qatar\nP.O. Box 12345',
+    address: '2/F, TOWER 1, TERN CENTRE, 237 QUEEN\'S ROAD CENTRAL\nSheung Wan\nHONG KONG',
     email: 'info@arabiantraderoute.com'
 };
 
@@ -50,7 +50,8 @@ export const DEFAULT_CUSTOM_BLOCKS = [
                 title: 'التسليم:',
                 items: [
                     'يتم التسليم الى مخازن العميل'
-                ]
+                ],
+                image: null
             },
             {
                 id: 'timeline-section',
@@ -60,7 +61,8 @@ export const DEFAULT_CUSTOM_BLOCKS = [
                     'مدة التحميل وإجراءات التخليص الجمركي قبل انطلاق المركب في الصين 5-7 أيام.',
                     'مدة الشحن البحري من المصنع الى ميناء حمد المتوقع: 25 يوم.',
                     'مدة التخليص الجمركي في ميناء حمد - الدوحة: يومي عمل من تاريخ تفريغ الحاوية.'
-                ]
+                ],
+                image: null
             },
             {
                 id: 'payment-section',
@@ -68,14 +70,16 @@ export const DEFAULT_CUSTOM_BLOCKS = [
                 items: [
                     '50% مقدماً عند تأكيد الطلب و50% قبل الشحن من المصنع.',
                     'التحويل بالدولار الأمريكي للأسعار عالية بالريال القطري إسترشادي حسب سعر الصرف.'
-                ]
+                ],
+                image: null
             },
             {
                 id: 'docs-section',
                 title: 'المستندات المطلوبة:',
                 items: [
                     'يتم الاستيراد باسم شركة العميل ويلتزم العميل بتوفير جميع المستندات والسجلات الرسمية للاستيراد من الصين و اللازمة لعملية الإفراج الجمركي.'
-                ]
+                ],
+                image: null
             }
         ]
     },
@@ -94,7 +98,8 @@ export const DEFAULT_CUSTOM_BLOCKS = [
                     'Bank SWIFT/BIC: DHBHKHKH',
                     "Bank address: G/F, The Center, 99 Queen's Road Central,Central, Hong Kong",
                     'Bank country: Hong Kong'
-                ]
+                ],
+                image: null
             }
         ]
     }

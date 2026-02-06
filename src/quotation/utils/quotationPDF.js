@@ -247,7 +247,7 @@ export const generateQuotationPDF = async (data) => {
     }
     tableHeader.push('Description', `Qty (${quantityUnit})`, 'Price (USD)', 'Total (USD)');
     if (showCertificationColumn) {
-        tableHeader.push('Cert/Lab Costs');
+        tableHeader.push('Extra');
     }
 
     // Build column styles
@@ -267,7 +267,7 @@ export const generateQuotationPDF = async (data) => {
     columnStyles[colIndex++] = { cellWidth: 22, halign: 'right' }; // Price
     columnStyles[colIndex++] = { cellWidth: 28, halign: 'right' }; // Total
     if (showCertificationColumn) {
-        columnStyles[colIndex++] = { cellWidth: 35, halign: 'left', overflow: 'linebreak' }; // Cert/Lab Costs
+        columnStyles[colIndex++] = { cellWidth: 35, halign: 'left', overflow: 'linebreak' }; // Extra
     }
 
     autoTable(doc, {
@@ -410,6 +410,23 @@ export const generateQuotationPDF = async (data) => {
                         yPos += (textLines.length * 6);
                     }
                 });
+
+                // Section Image (if present)
+                if (section.image) {
+                    try {
+                        const imgMaxWidth = 80;
+                        const imgMaxHeight = 60;
+                        // Check if we need a new page for the image
+                        checkPageSpace(imgMaxHeight + 10);
+                        // Position image on the right side (RTL layout)
+                        const imgX = pageWidth - margin - imgMaxWidth;
+                        doc.addImage(section.image, 'JPEG', imgX, yPos, imgMaxWidth, imgMaxHeight);
+                        yPos += imgMaxHeight + 5;
+                    } catch (e) {
+                        console.error('Error adding section image:', e);
+                    }
+                }
+
                 yPos += 4; // Spacing after section
             });
 

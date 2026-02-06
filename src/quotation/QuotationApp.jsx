@@ -60,7 +60,8 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
             id: block.id || `block-${Date.now()}-${i}`,
             sections: block.sections.map((section, j) => ({
                 ...section,
-                id: section.id || `section-${Date.now()}-${i}-${j}`
+                id: section.id || `section-${Date.now()}-${i}-${j}`,
+                image: section.image || null
             }))
         }));
     });
@@ -112,7 +113,7 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
 
     const addSection = (blockIndex) => {
         const newBlocks = [...customBlocks];
-        newBlocks[blockIndex].sections.push({ id: Date.now(), title: '', items: [''] });
+        newBlocks[blockIndex].sections.push({ id: Date.now(), title: '', items: [''], image: null });
         setCustomBlocks(newBlocks);
     };
 
@@ -192,6 +193,64 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
         [items[itemIndex], items[targetIndex]] = [items[targetIndex], items[itemIndex]];
         setCustomBlocks(newBlocks);
 
+    };
+
+    const handleSectionImageUpload = (blockIndex, sectionIndex, file) => {
+        if (!file || !file.type.startsWith('image/')) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                // Resize image to reasonable size (max 600px)
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                const maxSize = 600;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > maxSize) {
+                        height = (height * maxSize) / width;
+                        width = maxSize;
+                    }
+                } else {
+                    if (height > maxSize) {
+                        width = (width * maxSize) / height;
+                        height = maxSize;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+
+                const resizedImage = canvas.toDataURL('image/jpeg', 0.85);
+
+                const newBlocks = [...customBlocks];
+                newBlocks[blockIndex] = { ...newBlocks[blockIndex] };
+                newBlocks[blockIndex].sections = [...newBlocks[blockIndex].sections];
+                newBlocks[blockIndex].sections[sectionIndex] = {
+                    ...newBlocks[blockIndex].sections[sectionIndex],
+                    image: resizedImage
+                };
+                setCustomBlocks(newBlocks);
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const removeSectionImage = (blockIndex, sectionIndex) => {
+        const newBlocks = [...customBlocks];
+        newBlocks[blockIndex] = { ...newBlocks[blockIndex] };
+        newBlocks[blockIndex].sections = [...newBlocks[blockIndex].sections];
+        newBlocks[blockIndex].sections[sectionIndex] = {
+            ...newBlocks[blockIndex].sections[sectionIndex],
+            image: null
+        };
+        setCustomBlocks(newBlocks);
     };
 
     const handleGeneratePDF = async () => {
@@ -440,7 +499,7 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                         onChange={(e) => setShowCertificationColumn(e.target.checked)}
                                         style={{ cursor: 'pointer' }}
                                     />
-                                    Show Cert/Lab Test Costs
+                                    Show Extra Costs
                                 </label>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: QUOTATION_COLORS.textDark, cursor: 'pointer' }}>
                                     <input
@@ -483,7 +542,7 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                     <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}>Qty ({quantityUnit})</th>
                                     <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}>Price (USD)</th>
                                     <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}>Total (USD)</th>
-                                    {showCertificationColumn && <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}>Cert/Lab Costs</th>}
+                                    {showCertificationColumn && <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}>Extra</th>}
                                     <th style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '13px', fontWeight: '600' }}></th>
                                 </tr>
                             </thead>
@@ -828,6 +887,85 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                         >
                                             + Add Sub-item
                                         </button>
+
+                                        {/* Section Image */}
+                                        <div style={{
+                                            marginTop: '12px',
+                                            marginLeft: '24px',
+                                            padding: '8px',
+                                            border: `1px dashed ${QUOTATION_COLORS.textMuted}40`,
+                                            borderRadius: '6px',
+                                            background: `${QUOTATION_COLORS.background}`
+                                        }}>
+                                            {section.image ? (
+                                                <div style={{ position: 'relative', display: 'inline-block' }}>
+                                                    <img
+                                                        src={section.image}
+                                                        alt="Section image"
+                                                        style={{
+                                                            maxWidth: '200px',
+                                                            maxHeight: '150px',
+                                                            objectFit: 'contain',
+                                                            borderRadius: '4px',
+                                                            border: `1px solid ${QUOTATION_COLORS.textMuted}40`
+                                                        }}
+                                                    />
+                                                    <button
+                                                        onClick={() => removeSectionImage(blockIdx, sectionIdx)}
+                                                        style={{
+                                                            position: 'absolute',
+                                                            top: '-8px',
+                                                            right: '-8px',
+                                                            background: '#EF4444',
+                                                            color: 'white',
+                                                            border: 'none',
+                                                            borderRadius: '50%',
+                                                            width: '20px',
+                                                            height: '20px',
+                                                            cursor: 'pointer',
+                                                            fontSize: '12px',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center'
+                                                        }}
+                                                    >
+                                                        x
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <label style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    cursor: 'pointer',
+                                                    fontSize: '11px',
+                                                    color: QUOTATION_COLORS.textMuted
+                                                }}>
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        onChange={(e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (file) handleSectionImageUpload(blockIdx, sectionIdx, file);
+                                                            e.target.value = '';
+                                                        }}
+                                                        style={{ display: 'none' }}
+                                                    />
+                                                    <span style={{
+                                                        padding: '4px 8px',
+                                                        background: `${QUOTATION_COLORS.primary}20`,
+                                                        color: QUOTATION_COLORS.primary,
+                                                        border: `1px dashed ${QUOTATION_COLORS.primary}`,
+                                                        borderRadius: '4px',
+                                                        fontSize: '11px',
+                                                        fontWeight: '500'
+                                                    }}>
+                                                        + Add Image
+                                                    </span>
+                                                    <span>Optional image for this section</span>
+                                                </label>
+                                            )}
+                                        </div>
                                     </div>
                                 ))}
 
