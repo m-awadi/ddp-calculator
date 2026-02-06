@@ -123,23 +123,30 @@ export const generateQuotationPDF = async (data) => {
             page-break-inside: avoid;
         }
 
-        /* Prevent orphaned headers - keep with next content */
-        .terms-title,
-        .terms-section > div > strong {
+        /* Prevent orphaned headers - keep title with first item only */
+        .terms-title {
             break-after: avoid;
             page-break-after: avoid;
         }
 
-        /* Keep sections together when possible */
-        .terms-section > div {
-            break-inside: avoid;
-            page-break-inside: avoid;
+        /* Section titles (bullets) - keep with first sub-item */
+        .section-block > strong {
+            break-after: avoid;
+            page-break-after: avoid;
         }
 
-        /* Prevent widows and orphans in text */
-        p, .term-item {
-            orphans: 3;
-            widows: 3;
+        /* Allow sections to break across pages - only keep individual items together */
+        .terms-section {
+            break-inside: auto;
+            page-break-inside: auto;
+        }
+
+        /* Each term item (sub-bullet) can break independently */
+        .term-item {
+            break-inside: avoid;
+            page-break-inside: avoid;
+            orphans: 2;
+            widows: 2;
         }
 
         .header {
@@ -316,15 +323,10 @@ export const generateQuotationPDF = async (data) => {
             page-break-inside: avoid;
         }
 
-        /* Section with title - keep title with first item */
+        /* Section blocks - allow to break, but keep title with first item */
         .section-block {
-            break-inside: avoid;
-            page-break-inside: avoid;
-        }
-
-        .section-block strong {
-            break-after: avoid;
-            page-break-after: avoid;
+            break-inside: auto;
+            page-break-inside: auto;
         }
 
         .section-image {
