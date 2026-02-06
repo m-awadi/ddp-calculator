@@ -31,6 +31,7 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
     const [extraColumnLabel, setExtraColumnLabel] = useState('Extra');
     const [showQAR, setShowQAR] = useState(false);
     const [qarExchangeRate, setQarExchangeRate] = useState(3.65);
+    const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
     const [quantityUnit, setQuantityUnit] = useState('pcs');
     const [items, setItems] = useState(
         initialItems.length > 0
@@ -256,6 +257,8 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
     };
 
     const handleGeneratePDF = async () => {
+        if (isGeneratingPDF) return;
+        setIsGeneratingPDF(true);
         try {
             await generateQuotationPDF({
                 date: quotationDate,
@@ -278,7 +281,9 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
             });
         } catch (error) {
             console.error('Error generating PDF:', error);
-            alert('Error generating PDF. Please check the console for details.');
+            // Error alert is shown by the quotationPDF function
+        } finally {
+            setIsGeneratingPDF(false);
         }
     };
 
@@ -359,6 +364,7 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                         </button>
                         <button
                             onClick={handleGeneratePDF}
+                            disabled={isGeneratingPDF}
                             style={{
                                 padding: '10px 20px',
                                 background: QUOTATION_COLORS.secondary,
@@ -367,12 +373,12 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                 borderRadius: '6px',
                                 fontSize: '14px',
                                 fontWeight: '600',
-                                cursor: 'pointer',
-                                opacity: 0.7
+                                cursor: isGeneratingPDF ? 'wait' : 'pointer',
+                                opacity: isGeneratingPDF ? 0.6 : 1
                             }}
-                            title="Direct PDF download - Limited Arabic support"
+                            title="Server-rendered PDF with full Arabic support"
                         >
-                            📄 Direct PDF
+                            {isGeneratingPDF ? '⏳ Generating...' : '📄 Direct PDF'}
                         </button>
                         {onClose && (
                             <button

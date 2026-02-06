@@ -1,27 +1,8 @@
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { QUOTATION_COLORS } from './defaultTerms';
-import { preserveArabicText, detectTextDirection, processTextForPDF } from './arabicText';
-
-// Helper to convert image URL to base64
-const loadImageAsBase64 = async (url) => {
-    try {
-        const response = await fetch(url);
-        const blob = await response.blob();
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
-    } catch (error) {
-        console.error('Error loading image:', error);
-        return null;
-    }
-};
+import { detectTextDirection, escapeHtml } from './bidiUtils';
 
 /**
- * Generate professional quotation PDF matching Arabian Trade Route template
+ * Generate quotation PDF using server-side Puppeteer rendering
+ * This provides perfect Arabic/English bidirectional text support
  */
 export const generateQuotationPDF = async (data) => {
     const {
@@ -49,409 +30,435 @@ export const generateQuotationPDF = async (data) => {
         const usdFormatted = '$' + usdAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         if (showQAR) {
             const qarAmount = usdAmount * qarExchangeRate;
-            return `${usdFormatted}\n(${qarAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} QAR)`;
+            return `${usdFormatted}<br><span class="qar-amount">(${qarAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} QAR)</span>`;
         }
         return usdFormatted;
     };
 
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 15;
-
-    // Convert hex colors to RGB
-    const hexToRgb = (hex) => {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? {
-            r: parseInt(result[1], 16),
-            g: parseInt(result[2], 16),
-            b: parseInt(result[3], 16)
-        } : { r: 0, g: 0, b: 0 };
-    };
-
-    const primaryRGB = hexToRgb(QUOTATION_COLORS.primary);
-    const secondaryRGB = hexToRgb(QUOTATION_COLORS.secondary);
-    const backgroundRGB = hexToRgb(QUOTATION_COLORS.background);
-
-    // Load logo and footer images
-    const logoImage = await loadImageAsBase64('/logo-standalone-web.png');
-    const footerImage = await loadImageAsBase64('/footer.png');
-
-    let yPos = margin;
-
-    // Helper to add logo
-    const addLogo = (x, y, width = 30, height = 30) => {
-        if (logoImage) {
-            try {
-                doc.addImage(logoImage, 'PNG', x, y, width, height);
-            } catch (e) {
-                console.error('Error adding logo:', e);
-            }
-        }
-    };
-
-    // Add page background
-    doc.setFillColor(backgroundRGB.r, backgroundRGB.g, backgroundRGB.b);
-    doc.rect(0, 0, pageWidth, pageHeight, 'F');
-
-    // Company name and logo
-    addLogo(pageWidth - margin - 30, yPos, 30, 30);
-
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(primaryRGB.r, primaryRGB.g, primaryRGB.b);
-    doc.text(companyInfo.name, margin, yPos + 7);
-
-    yPos += 12;
-
-    // Company address
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(60, 60, 60);
-    const addressLines = companyInfo.address.split('\n');
-    addressLines.forEach(line => {
-        doc.text(line, margin, yPos);
-        yPos += 4;
-    });
-
-    // Email
-    doc.text(companyInfo.email, margin, yPos);
-    yPos += 8;
-
-    // Date
     const formattedDate = new Date(date).toLocaleDateString('en-GB', {
         day: 'numeric',
         month: 'short',
         year: 'numeric'
     });
-    doc.text(formattedDate, margin, yPos);
-    yPos += 10;
 
-    // Title "DDP Quotation"
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(primaryRGB.r, primaryRGB.g, primaryRGB.b);
-    doc.text('DDP Quotation', pageWidth / 2, yPos, { align: 'center' });
-    yPos += 10;
+    // Generate standalone HTML with embedded fonts from Google Fonts CDN
+    // Using Noto Sans Arabic for proper Arabic text support + Roboto for English
+    const html = `
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${companyInfo.name} - Quotation - ${formattedDate}</title>
 
-    // Items table
-    const tableData = items.map((item, index) => {
-        const row = [
-            (index + 1).toString(),
-        ];
-        if (showPictureColumn) {
-            row.push(''); // Image placeholder
+    <!-- Google Fonts with Arabic support -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        // Process description with bidi handling for mixed Arabic/English text
-        const processedDescription = processTextForPDF(item.description || '');
-        row.push(
-            processedDescription,
-            item.quantity.toString(),
-            formatCurrency(item.price),
-            formatCurrency(item.quantity * item.price)
-        );
-        // Add certification column if enabled
-        if (showCertificationColumn) {
-            const certCost = parseFloat(item.certificationCost) || 0;
-            const labCost = parseFloat(item.labTestCost) || 0;
-            const oneTimeCost = parseFloat(item.oneTimeCost) || 0;
-            const totalItemAddons = certCost + labCost + oneTimeCost;
-            let certText = '';
-            if (totalItemAddons > 0) {
-                const parts = [];
-                if (item.certificationType) {
-                    parts.push(item.certificationType);
-                }
-                if (certCost > 0) {
-                    parts.push(`Cert: $${certCost.toFixed(2)}`);
-                }
-                if (labCost > 0) {
-                    parts.push(`Lab: $${labCost.toFixed(2)}`);
-                }
-                if (oneTimeCost > 0) {
-                    const desc = item.oneTimeCostDescription || 'One-Time';
-                    parts.push(`${desc}: $${oneTimeCost.toFixed(2)}`);
-                }
-                certText = parts.join('\n');
+
+        @page {
+            size: A4;
+            margin: 0;
+        }
+
+        body {
+            font-family: 'Roboto', 'Noto Sans Arabic', sans-serif;
+            background: #FFFFFF;
+            color: #1B2B38;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            background: #FFFFFF;
+            position: relative;
+            page-break-after: always;
+            padding: 15mm 10mm;
+            box-shadow: none;
+            color: #1B2B38;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .logo {
+            width: 80px;
+            height: 80px;
+        }
+
+        .company-info {
+            text-align: left;
+            direction: ltr;
+        }
+
+        .company-name {
+            font-size: 20px;
+            font-weight: bold;
+            color: #D65A1F;
+            margin-bottom: 5px;
+        }
+
+        .company-details {
+            font-size: 11px;
+            color: #333333;
+            line-height: 1.4;
+        }
+
+        .quotation-title {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #D65A1F;
+            margin: 20px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            direction: ltr;
+        }
+
+        th {
+            background: #D65A1F;
+            color: #FFFFFF;
+            padding: 12px 8px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        td {
+            border: 1px solid #ddd;
+            padding: 10px 8px;
+            text-align: center;
+            font-size: 11px;
+            color: #1B2B38;
+        }
+
+        td.description {
+            font-weight: bold;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 200px;
+            white-space: pre-wrap;
+        }
+
+        /* Bidirectional text support */
+        .bidi-rtl {
+            direction: rtl;
+            text-align: right;
+            unicode-bidi: isolate;
+            font-family: 'Noto Sans Arabic', 'Roboto', sans-serif;
+        }
+
+        .bidi-ltr {
+            direction: ltr;
+            text-align: left;
+            unicode-bidi: isolate;
+        }
+
+        .item-image {
+            max-width: 300px;
+            max-height: 300px;
+            object-fit: contain;
+            display: block;
+            margin: 4px auto;
+        }
+
+        .images-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .cert-cell {
+            font-size: 10px;
+            text-align: left;
+            padding: 8px;
+            vertical-align: top;
+        }
+
+        .cert-type {
+            font-weight: bold;
+            color: #D65A1F;
+            margin-bottom: 4px;
+        }
+
+        .cert-detail {
+            color: #333333;
+            margin: 2px 0;
+        }
+
+        .total-row {
+            background: #D65A1F;
+            color: #FFFFFF;
+            font-weight: bold;
+        }
+
+        .total-row td {
+            color: #FFFFFF;
+        }
+
+        .grand-total-row {
+            background: #EC722D;
+            color: #FFFFFF;
+            font-weight: bold;
+        }
+
+        .grand-total-row td {
+            color: #FFFFFF;
+        }
+
+        .qar-amount {
+            font-size: 10px;
+            color: #666666;
+            display: block;
+        }
+
+        .total-row .qar-amount,
+        .grand-total-row .qar-amount {
+            color: #FFFFFF;
+            opacity: 0.9;
+        }
+
+        .terms-section {
+            margin: 20px 0;
+            font-family: 'Noto Sans Arabic', 'Roboto', sans-serif;
+        }
+
+        .terms-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #D65A1F;
+            margin-bottom: 10px;
+        }
+
+        .term-item {
+            margin: 8px 0 8px 20px;
+            font-size: 12px;
+            line-height: 1.8;
+            color: #1B2B38;
+        }
+
+        .section-image {
+            max-width: 100%;
+            max-height: 200px;
+            object-fit: contain;
+            margin: 10px 0 10px 20px;
+            border-radius: 4px;
+        }
+
+        .footer-bar {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            max-height: 80px;
+            max-width: 300px;
+            object-fit: contain;
+            display: none;
+        }
+
+        .page:last-of-type .footer-bar {
+            display: block;
+        }
+
+        @media print {
+            body {
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
+                background: #FFFFFF !important;
+                color: #1B2B38 !important;
             }
-            row.push(certText);
-        }
-        return row;
-    });
-
-    // Calculate colSpan based on visible columns
-    const baseColSpan = showPictureColumn ? 5 : 4;
-
-    // Add total row
-    const totalRowData = [];
-    totalRowData.push({
-        content: totalAddonsCost > 0 ? 'Product Total' : 'Total',
-        colSpan: baseColSpan,
-        styles: {
-            fillColor: [primaryRGB.r, primaryRGB.g, primaryRGB.b],
-            textColor: [255, 255, 255],
-            fontStyle: 'bold',
-            halign: 'left'
-        }
-    });
-    totalRowData.push({
-        content: formatCurrency(totalUSD),
-        styles: {
-            fillColor: [primaryRGB.r, primaryRGB.g, primaryRGB.b],
-            textColor: [255, 255, 255],
-            fontStyle: 'bold',
-            halign: 'right'
-        }
-    });
-    // Add certification total column if enabled
-    if (showCertificationColumn) {
-        totalRowData.push({
-            content: totalAddonsCost > 0 ? formatCurrency(totalAddonsCost) : '',
-            styles: {
-                fillColor: [primaryRGB.r, primaryRGB.g, primaryRGB.b],
-                textColor: [255, 255, 255],
-                fontStyle: 'bold',
-                halign: 'right'
+            .page {
+                margin: 0;
+                page-break-after: always;
+                background: #FFFFFF !important;
+                color: #1B2B38 !important;
             }
-        });
-    }
-    tableData.push(totalRowData);
-
-    // Add grand total row if add-on costs exist (ALWAYS shown when there are add-ons)
-    if (totalAddonsCost > 0) {
-        const grandTotalRow = [];
-        grandTotalRow.push({
-            content: 'Grand Total (Products + Add-ons)',
-            colSpan: baseColSpan,
-            styles: {
-                fillColor: [secondaryRGB.r, secondaryRGB.g, secondaryRGB.b],
-                textColor: [255, 255, 255],
-                fontStyle: 'bold',
-                halign: 'left'
+            td {
+                color: #1B2B38 !important;
             }
-        });
-        grandTotalRow.push({
-            content: formatCurrency(totalUSD + totalAddonsCost),
-            colSpan: showCertificationColumn ? 2 : 1,
-            styles: {
-                fillColor: [secondaryRGB.r, secondaryRGB.g, secondaryRGB.b],
-                textColor: [255, 255, 255],
-                fontStyle: 'bold',
-                halign: 'right'
-            }
-        });
-        tableData.push(grandTotalRow);
-    }
-
-    // Build table header
-    const tableHeader = ['Item'];
-    if (showPictureColumn) {
-        tableHeader.push('Picture');
-    }
-    tableHeader.push('Description', `Qty (${quantityUnit})`, 'Price (USD)', 'Total (USD)');
-    if (showCertificationColumn) {
-        tableHeader.push(extraColumnLabel);
-    }
-
-    // Build column styles
-    const columnStyles = {};
-    let colIndex = 0;
-    columnStyles[colIndex++] = { cellWidth: 15, halign: 'center' }; // Item
-    if (showPictureColumn) {
-        columnStyles[colIndex++] = { cellWidth: showCertificationColumn ? 50 : 60, halign: 'center' }; // PIC (smaller when cert column)
-    }
-    // Description column - enable linebreak overflow for multi-line text
-    columnStyles[colIndex++] = {
-        cellWidth: showPictureColumn ? (showCertificationColumn ? 40 : 50) : 90,
-        overflow: 'linebreak',  // Allow text to wrap to multiple lines
-        cellPadding: { top: 4, right: 4, bottom: 4, left: 4 }  // Add padding for wrapped text
-    };
-    columnStyles[colIndex++] = { cellWidth: 20, halign: 'center' }; // Qty
-    columnStyles[colIndex++] = { cellWidth: 22, halign: 'right' }; // Price
-    columnStyles[colIndex++] = { cellWidth: 28, halign: 'right' }; // Total
-    if (showCertificationColumn) {
-        columnStyles[colIndex++] = { cellWidth: 35, halign: 'left', overflow: 'linebreak' }; // Extra column (dynamic label)
-    }
-
-    autoTable(doc, {
-        startY: yPos,
-        head: [tableHeader],
-        body: tableData,
-        theme: 'grid',
-        headStyles: {
-            fillColor: [primaryRGB.r, primaryRGB.g, primaryRGB.b],
-            textColor: [255, 255, 255],
-            fontSize: 10,
-            fontStyle: 'bold',
-            halign: 'center'
-        },
-        columnStyles: columnStyles,
-        styles: {
-            fontSize: 9,
-            cellPadding: 3,
-            lineColor: [200, 200, 200],
-            lineWidth: 0.5
-        },
-        didDrawCell: (data) => {
-            // Add images to PIC column (index 1 when shown)
-            const picColumnIndex = showPictureColumn ? 1 : -1;
-            if (showPictureColumn && data.column.index === picColumnIndex && data.row.index < items.length) {
-                const item = items[data.row.index];
-                // Support both legacy single image and new multi-image array
-                const images = item.images && item.images.length > 0 ? item.images : (item.image ? [item.image] : []);
-
-                if (images.length > 0) {
-                    const cellX = data.cell.x;
-                    const cellY = data.cell.y;
-                    const cellWidth = data.cell.width;
-                    const cellHeight = data.cell.height;
-
-                    try {
-                        // Calculate space for multiple images stacked vertically
-                        const imageCount = images.length;
-                        const totalGap = (imageCount - 1) * 2; // 2mm gap between images
-                        const availableHeight = cellHeight - 4 - totalGap;
-                        const maxImgHeight = Math.min(availableHeight / imageCount, cellWidth - 4);
-
-                        let currentY = cellY + 2;
-
-                        images.forEach((imgSrc, imgIdx) => {
-                            const imgSize = Math.min(maxImgHeight, cellWidth - 4);
-                            const imgX = cellX + (cellWidth - imgSize) / 2;
-
-                            doc.addImage(imgSrc, 'JPEG', imgX, currentY, imgSize, imgSize);
-                            currentY += imgSize + 2; // Move down for next image
-                        });
-                    } catch (e) {
-                        console.error('Error adding image:', e);
-                    }
-                }
+            .total-row td,
+            .grand-total-row td {
+                color: #FFFFFF !important;
             }
         }
-    });
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="header">
+            <div class="company-info">
+                <div class="company-name">${escapeHtml(companyInfo.name)}</div>
+                <div class="company-details">${escapeHtml(companyInfo.address).replace(/\n/g, '<br>')}</div>
+                <div class="company-details">${escapeHtml(companyInfo.email)}</div>
+                <div class="company-details">${formattedDate}</div>
+            </div>
+            <img src="${window.location.origin}/logo-standalone-web.png" alt="Logo" class="logo" crossorigin="anonymous">
+        </div>
 
-    // Footer image on first page (bottom right, maintain aspect ratio)
-    if (footerImage) {
-        try {
-            const footerMaxWidth = 100;
-            const footerMaxHeight = 30;
-            const footerX = pageWidth - margin - footerMaxWidth;
-            const footerY = pageHeight - margin - footerMaxHeight;
-            doc.addImage(footerImage, 'PNG', footerX, footerY, footerMaxWidth, footerMaxHeight);
-        } catch (e) {
-            console.error('Error adding footer:', e);
-        }
-    }
+        <div class="quotation-title">DDP Quotation</div>
 
-    // Check if we need a new page for terms section
-    const checkPageSpace = (requiredHeight) => {
-        if (yPos + requiredHeight > pageHeight - margin - 30) {
-            doc.addPage();
-            // Add page background
-            doc.setFillColor(backgroundRGB.r, backgroundRGB.g, backgroundRGB.b);
-            doc.rect(0, 0, pageWidth, pageHeight, 'F');
+        <table>
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    ${showPictureColumn ? '<th>Picture</th>' : ''}
+                    <th>Description</th>
+                    <th>Qty (${quantityUnit})</th>
+                    <th>Price (USD)</th>
+                    <th>Total (USD)</th>
+                    ${showCertificationColumn ? `<th>${escapeHtml(extraColumnLabel)}</th>` : ''}
+                </tr>
+            </thead>
+            <tbody>
+                ${items.map((item, index) => {
+                    const certCost = parseFloat(item.certificationCost) || 0;
+                    const labCost = parseFloat(item.labTestCost) || 0;
+                    const oneTimeCost = parseFloat(item.oneTimeCost) || 0;
+                    const totalItemAddons = certCost + labCost + oneTimeCost;
+                    const oneTimeDesc = item.oneTimeCostDescription || 'One-Time';
+                    const images = item.images && item.images.length > 0 ? item.images : (item.image ? [item.image] : []);
+                    const descriptionText = item.description || '';
+                    const descriptionDir = detectTextDirection(descriptionText);
+                    const descriptionHtml = escapeHtml(descriptionText).replace(/\n/g, '<br>');
+                    return `
+                    <tr>
+                        <td>${index + 1}</td>
+                        ${showPictureColumn ? `<td>${images.length > 0 ? `<div class="images-container">${images.map((img, imgIdx) => `<img src="${img}" class="item-image" alt="Product ${imgIdx + 1}">`).join('')}</div>` : ''}</td>` : ''}
+                        <td class="description ${descriptionDir === 'rtl' ? 'bidi-rtl' : 'bidi-ltr'}">${descriptionHtml}</td>
+                        <td>${item.quantity}</td>
+                        <td>${formatCurrency(item.price)}</td>
+                        <td>${formatCurrency(item.quantity * item.price)}</td>
+                        ${showCertificationColumn ? `
+                        <td class="cert-cell">
+                            ${totalItemAddons > 0 ? `
+                                ${item.certificationType ? `<div class="cert-type">${escapeHtml(item.certificationType)}</div>` : ''}
+                                ${certCost > 0 ? `<div class="cert-detail">Cert: $${certCost.toFixed(2)}</div>` : ''}
+                                ${labCost > 0 ? `<div class="cert-detail">Lab: $${labCost.toFixed(2)}</div>` : ''}
+                                ${oneTimeCost > 0 ? `<div class="cert-detail">${escapeHtml(oneTimeDesc)}: $${oneTimeCost.toFixed(2)}</div>` : ''}
+                                <div class="cert-detail" style="font-weight: bold; margin-top: 4px;">Total: $${totalItemAddons.toFixed(2)}</div>
+                            ` : ''}
+                        </td>
+                        ` : ''}
+                    </tr>
+                `}).join('')}
+                <tr class="total-row">
+                    <td colspan="${showPictureColumn ? '5' : '4'}">${totalAddonsCost > 0 ? 'Product Total' : 'Total'}</td>
+                    <td>${formatCurrency(totalUSD)}</td>
+                    ${showCertificationColumn ? `<td>${totalAddonsCost > 0 ? formatCurrency(totalAddonsCost) : ''}</td>` : ''}
+                </tr>
+                ${totalAddonsCost > 0 ? `
+                <tr class="grand-total-row">
+                    <td colspan="${showPictureColumn ? (showCertificationColumn ? '6' : '5') : (showCertificationColumn ? '5' : '4')}">Grand Total (Products + Add-ons)</td>
+                    <td colspan="${showCertificationColumn ? '2' : '1'}">${formatCurrency(totalUSD + totalAddonsCost)}</td>
+                </tr>
+                ` : ''}
+            </tbody>
+        </table>
 
-            yPos = margin;
-            // Add logo on top right
-            addLogo(pageWidth - margin - 30, yPos, 30, 30);
-            yPos += 40;
-            return true;
-        }
-        return false;
-    };
+        <!-- Custom Blocks (Terms & Bank Details) -->
+        ${customBlocks.map(block => {
+            const blockTitleDir = detectTextDirection(block.title);
+            return `
+            <div class="terms-section" style="margin-top: 30px; direction: ${blockTitleDir}; text-align: ${blockTitleDir === 'rtl' ? 'right' : 'left'};">
+                <div class="terms-title ${blockTitleDir === 'rtl' ? 'bidi-rtl' : 'bidi-ltr'}">${escapeHtml(block.title)}</div>
+                ${block.sections.map(section => {
+                    const sectionTitleDir = detectTextDirection(section.title);
+                    return `
+                    <div style="margin-top: 15px;">
+                        <strong class="${sectionTitleDir === 'rtl' ? 'bidi-rtl' : 'bidi-ltr'}" style="display: inline-block;">● ${escapeHtml(section.title)}</strong>
+                        ${section.items.map(item => {
+                            const itemDir = detectTextDirection(item);
+                            return `<div class="term-item ${itemDir === 'rtl' ? 'bidi-rtl' : 'bidi-ltr'}">○ ${escapeHtml(item)}</div>`;
+                        }).join('')}
+                        ${section.image ? `<img src="${section.image}" alt="Section image" class="section-image">` : ''}
+                    </div>
+                `}).join('')}
+            </div>
+        `}).join('')}
 
-    // Calculate estimated height for a custom block
-    const estimateBlockHeight = (block) => {
-        let height = 20; // Block title + margin
+        <img src="${window.location.origin}/footer.png" alt="Footer" class="footer-bar" crossorigin="anonymous">
+    </div>
+</body>
+</html>
+    `;
 
-        block.sections.forEach(section => {
-            height += 10; // Section title
-            height += (section.items.length * 6) + 5; // Items
-        });
-
-        return height;
-    };
-
-    // Render Custom Blocks
-    if (customBlocks && customBlocks.length > 0) {
-        // Add spacing before terms
-        yPos += 15;
-
-        customBlocks.forEach(block => {
-            // Check if whole block fits, if not conservatively checks per section/item
-            // But if block title is near end, push to new page
-            checkPageSpace(20);
-
-            // Block Title
-            doc.setFontSize(12);
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(primaryRGB.r, primaryRGB.g, primaryRGB.b);
-            doc.text(preserveArabicText(block.title), pageWidth - margin, yPos, { align: 'right', lang: 'ar' });
-            yPos += 10;
-
-            block.sections.forEach(section => {
-                checkPageSpace(15);
-
-                // Section Title
-                doc.setFontSize(10);
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(60, 60, 60);
-                doc.text(preserveArabicText('● ' + section.title), pageWidth - margin, yPos, { align: 'right', lang: 'ar' });
-                yPos += 6;
-
-                // Section Items
-                doc.setFont('helvetica', 'normal');
-                section.items.forEach(item => {
-                    if (item && item.toString().trim()) {
-                        checkPageSpace(8);
-                        // Note: We use '○' for items
-                        doc.text(preserveArabicText('○ ' + item), pageWidth - margin, yPos, { align: 'right', maxWidth: pageWidth - 2 * margin, lang: 'ar' });
-
-                        // Calculate height of the text just added to increment yPos correctly
-                        // splitTextToSize approximates lines, we assume ~5-6 per line
-                        const textLines = doc.splitTextToSize(preserveArabicText('○ ' + item), pageWidth - 2 * margin);
-                        yPos += (textLines.length * 6);
-                    }
-                });
-
-                // Section Image (if present)
-                if (section.image) {
-                    try {
-                        const imgMaxWidth = 80;
-                        const imgMaxHeight = 60;
-                        // Check if we need a new page for the image
-                        checkPageSpace(imgMaxHeight + 10);
-                        // Position image on the right side (RTL layout)
-                        const imgX = pageWidth - margin - imgMaxWidth;
-                        doc.addImage(section.image, 'JPEG', imgX, yPos, imgMaxWidth, imgMaxHeight);
-                        yPos += imgMaxHeight + 5;
-                    } catch (e) {
-                        console.error('Error adding section image:', e);
-                    }
-                }
-
-                yPos += 4; // Spacing after section
-            });
-
-            yPos += 8; // Spacing after block
-        });
-    }
-
-    // Footer image on second page (bottom right, maintain aspect ratio)
-    if (footerImage) {
-        try {
-            const footerMaxWidth = 100;
-            const footerMaxHeight = 30;
-            const footerX = pageWidth - margin - footerMaxWidth;
-            const footerY = pageHeight - margin - footerMaxHeight;
-            doc.addImage(footerImage, 'PNG', footerX, footerY, footerMaxWidth, footerMaxHeight);
-        } catch (e) {
-            console.error('Error adding footer:', e);
-        }
-    }
-
-    // Download
+    // Generate filename
     const timestamp = new Date().toISOString().slice(0, 10);
     const safeCompanyName = companyInfo.name.replace(/[^a-z0-9]/gi, '-').replace(/-+/g, '-');
-    doc.save(`${safeCompanyName}-Quotation-${timestamp}.pdf`);
+    const filename = `${safeCompanyName}-Quotation-${timestamp}.pdf`;
+
+    try {
+        // Determine backend URL based on environment
+        const backendUrl = getBackendUrl();
+
+        // Send HTML to backend for PDF generation
+        const response = await fetch(`${backendUrl}/api/documents/html-to-pdf`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ html, filename }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || `Server error: ${response.status}`);
+        }
+
+        // Download the PDF
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+        console.error('Error generating PDF via server:', error);
+        // Show user-friendly error message
+        alert(`Failed to generate PDF: ${error.message}\n\nPlease try the "Print to PDF" option instead.`);
+        throw error;
+    }
 };
+
+/**
+ * Determine the backend URL based on current environment
+ */
+function getBackendUrl() {
+    // In production/staging, use relative URL (same origin)
+    if (window.location.hostname.includes('arabiantraderoute.com') ||
+        window.location.hostname.includes('tradebridgesme.com')) {
+        // The DDP calculator runs on internal subdomain, backend is proxied
+        return '';
+    }
+
+    // Local development
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return 'http://localhost:3001';
+    }
+
+    // Default to same origin
+    return '';
+}
