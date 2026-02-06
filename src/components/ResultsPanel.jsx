@@ -35,12 +35,34 @@ const ResultsPanel = ({ results, items, settings, previewResults = null, customs
     };
 
     const handleGenerateQuotation = () => {
-        const quotationItems = itemBreakdowns.map(item => ({
-            description: item.description,
-            quantity: item.quantity,
-            unitType: item.unitType,
-            ddpPerUnit: item.ddpPerUnit
-        }));
+        const quotationItems = itemBreakdowns.map(item => {
+            // Calculate total fixed cost for this item (one-time costs)
+            const totalFixedCost = (item.fixedCosts || []).reduce((sum, cost) => sum + (parseFloat(cost.cost) || 0), 0);
+            const fixedCostDescriptions = (item.fixedCosts || [])
+                .filter(cost => cost.name && parseFloat(cost.cost) > 0)
+                .map(cost => cost.name)
+                .join(', ');
+
+            // Calculate total certification cost for this item
+            const totalCertCost = (item.certifications || []).reduce((sum, cert) => sum + (parseFloat(cert.cost) || 0), 0);
+            const certDescriptions = (item.certifications || [])
+                .filter(cert => cert.name && parseFloat(cert.cost) > 0)
+                .map(cert => cert.name)
+                .join(', ');
+
+            return {
+                description: item.description,
+                quantity: item.quantity,
+                unitType: item.unitType,
+                ddpPerUnit: item.ddpPerUnit,
+                // Pass certification costs
+                certificationCost: totalCertCost,
+                certificationType: certDescriptions,
+                // Pass fixed costs as oneTimeCost (quotation uses this field)
+                oneTimeCost: totalFixedCost,
+                oneTimeCostDescription: fixedCostDescriptions || 'Fixed Costs'
+            };
+        });
         const payload = JSON.stringify(quotationItems);
         sessionStorage.setItem('quotationItems', payload);
         localStorage.setItem('quotationItems', payload);
@@ -192,6 +214,15 @@ const ResultsPanel = ({ results, items, settings, previewResults = null, customs
                     previewAmount={previewResults?.costs.certificationCost}
                     showPreview={customsPreviewEnabled && previewResults}
                 />
+
+                {costs.fixedCostTotal > 0 && (
+                    <CostRow
+                        label="Fixed Costs (One-time)"
+                        amount={costs.fixedCostTotal}
+                        previewAmount={previewResults?.costs.fixedCostTotal}
+                        showPreview={customsPreviewEnabled && previewResults}
+                    />
+                )}
 
                 <CostRow
                     label="Landed Cost"

@@ -53,6 +53,28 @@ const ItemRow = ({ item, index, onUpdate, onRemove, pricingMode = 'EXW' }) => {
 
     const totalCertificationCost = (item.certifications || []).reduce((sum, cert) => sum + (parseFloat(cert.cost) || 0), 0);
 
+    // Fixed costs management (one-time costs not affected by quantity)
+    const [showFixedCosts, setShowFixedCosts] = useState(false);
+
+    const addFixedCost = () => {
+        const fixedCosts = item.fixedCosts || [];
+        onUpdate(index, 'fixedCosts', [...fixedCosts, { name: '', cost: 0 }]);
+        setShowFixedCosts(true);
+    };
+
+    const removeFixedCost = (costIndex) => {
+        const fixedCosts = item.fixedCosts || [];
+        onUpdate(index, 'fixedCosts', fixedCosts.filter((_, i) => i !== costIndex));
+    };
+
+    const updateFixedCost = (costIndex, field, value) => {
+        const fixedCosts = [...(item.fixedCosts || [])];
+        fixedCosts[costIndex][field] = value;
+        onUpdate(index, 'fixedCosts', fixedCosts);
+    };
+
+    const totalFixedCost = (item.fixedCosts || []).reduce((sum, cost) => sum + (parseFloat(cost.cost) || 0), 0);
+
     return (
         <div style={{
             display: 'grid',
@@ -401,6 +423,107 @@ const ItemRow = ({ item, index, onUpdate, onRemove, pricingMode = 'EXW' }) => {
                                 color: 'var(--text-primary)',
                             }}>
                                 Total Certification Cost: ${totalCertificationCost.toFixed(2)}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Fixed Costs Section */}
+                <button
+                    onClick={() => setShowFixedCosts(!showFixedCosts)}
+                    style={{
+                        padding: '6px 12px',
+                        fontSize: '12px',
+                        background: showFixedCosts ? 'var(--accent-purple)' : 'var(--bg-secondary)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '6px',
+                        color: showFixedCosts ? 'white' : 'var(--text-muted)',
+                        cursor: 'pointer',
+                        transition: '0.2s',
+                        marginLeft: '8px',
+                    }}
+                >
+                    {showFixedCosts ? '▼' : '▶'} Fixed Costs (One-time) {totalFixedCost > 0 ? `($${totalFixedCost.toFixed(2)})` : ''}
+                </button>
+
+                {showFixedCosts && (
+                    <div style={{
+                        marginTop: '12px',
+                        padding: '12px',
+                        background: 'var(--bg-secondary)',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border)',
+                    }}>
+                        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                            One-time costs that are NOT multiplied by quantity (e.g., tooling, setup fees, samples)
+                        </p>
+                        {(item.fixedCosts || []).map((fixedCost, costIndex) => (
+                            <div key={costIndex} style={{
+                                display: 'grid',
+                                gridTemplateColumns: '2fr 1fr auto',
+                                gap: '8px',
+                                marginBottom: '8px',
+                                alignItems: 'end',
+                            }}>
+                                <Input
+                                    label={costIndex === 0 ? "Cost Description" : null}
+                                    value={fixedCost.name}
+                                    onChange={v => updateFixedCost(costIndex, 'name', v)}
+                                    placeholder="e.g., Tooling, Setup, Sample"
+                                />
+                                <Input
+                                    label={costIndex === 0 ? "Cost (USD)" : null}
+                                    type="number"
+                                    value={fixedCost.cost}
+                                    onChange={v => updateFixedCost(costIndex, 'cost', parseFloat(v) || 0)}
+                                    prefix="$"
+                                    step="0.01"
+                                />
+                                <button
+                                    onClick={() => removeFixedCost(costIndex)}
+                                    style={{
+                                        padding: '8px 12px',
+                                        background: 'var(--accent-rose)20',
+                                        border: '1px solid var(--accent-rose)40',
+                                        borderRadius: '6px',
+                                        color: 'var(--accent-rose)',
+                                        cursor: 'pointer',
+                                        fontSize: '14px',
+                                        marginBottom: costIndex === 0 ? '16px' : '0',
+                                    }}
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        ))}
+
+                        <button
+                            onClick={addFixedCost}
+                            style={{
+                                padding: '8px 16px',
+                                fontSize: '12px',
+                                background: 'var(--accent-purple)20',
+                                border: '1px solid var(--accent-purple)40',
+                                borderRadius: '6px',
+                                color: 'var(--accent-purple)',
+                                cursor: 'pointer',
+                                transition: '0.2s',
+                                marginTop: (item.fixedCosts || []).length > 0 ? '4px' : '0',
+                            }}
+                        >
+                            + Add Fixed Cost
+                        </button>
+
+                        {totalFixedCost > 0 && (
+                            <div style={{
+                                marginTop: '12px',
+                                paddingTop: '12px',
+                                borderTop: '1px solid var(--border)',
+                                fontSize: '13px',
+                                fontWeight: '600',
+                                color: 'var(--text-primary)',
+                            }}>
+                                Total Fixed Costs: ${totalFixedCost.toFixed(2)}
                             </div>
                         )}
                     </div>

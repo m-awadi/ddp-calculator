@@ -199,6 +199,7 @@ const performDDPCalculation = (inputItems, settings, overrides) => {
     let totalCbm = 0;
     let totalWeight = 0;
     let totalCertificationCost = 0;
+    let totalFixedCost = 0;
 
     items.forEach(item => {
         totalCbm += (item.cbmPerUnit || 0) * item.quantity;
@@ -206,6 +207,12 @@ const performDDPCalculation = (inputItems, settings, overrides) => {
         if (item.certifications && Array.isArray(item.certifications)) {
             item.certifications.forEach(cert => {
                 totalCertificationCost += parseNumberInput(cert.cost);
+            });
+        }
+        // Fixed costs (one-time costs not multiplied by quantity)
+        if (item.fixedCosts && Array.isArray(item.fixedCosts)) {
+            item.fixedCosts.forEach(cost => {
+                totalFixedCost += parseNumberInput(cost.cost);
             });
         }
     });
@@ -268,8 +275,11 @@ const performDDPCalculation = (inputItems, settings, overrides) => {
     // Certification cost (base + per-item certifications)
     const certificationCost = rates.certificationCost + totalCertificationCost;
 
+    // Fixed costs (one-time costs not multiplied by quantity)
+    const fixedCostTotal = totalFixedCost;
+
     // Total landed cost (before margin and commission)
-    const landedCostBeforeMargin = totalExwCost + freightSubtotal + totalQatarChargesUsd + certificationCost + insurance;
+    const landedCostBeforeMargin = totalExwCost + freightSubtotal + totalQatarChargesUsd + certificationCost + fixedCostTotal + insurance;
 
     // Calculate profit margin and commission totals
     let profitMargin = 0;
@@ -302,14 +312,17 @@ const performDDPCalculation = (inputItems, settings, overrides) => {
         // Calculate item-specific certification cost
         const itemCertificationCost = (item.certifications || []).reduce((sum, cert) => sum + parseNumberInput(cert.cost), 0);
 
-        // Allocate costs (pro-rate base certification, but add item-specific certs directly)
+        // Calculate item-specific fixed costs (one-time, not multiplied by quantity)
+        const itemFixedCost = (item.fixedCosts || []).reduce((sum, cost) => sum + parseNumberInput(cost.cost), 0);
+
+        // Allocate costs (pro-rate base certification, but add item-specific certs and fixed costs directly)
         const allocatedFreight = freightSubtotal * cbmRatio;
         const allocatedQatarCharges = totalQatarChargesUsd * valueRatio;
         const allocatedBaseCertification = rates.certificationCost * valueRatio;
         const allocatedInsurance = insurance * valueRatio;
 
         const itemLandedCost = itemTotal + allocatedFreight + allocatedQatarCharges +
-                               allocatedBaseCertification + itemCertificationCost + allocatedInsurance;
+                               allocatedBaseCertification + itemCertificationCost + itemFixedCost + allocatedInsurance;
 
         // Calculate profit margin (percentage or fixed USD)
         const itemMargin = settings.profitMarginMode === 'percentage'
@@ -336,6 +349,7 @@ const performDDPCalculation = (inputItems, settings, overrides) => {
             allocatedFreight,
             allocatedQatarCharges,
             allocatedCertification: allocatedBaseCertification + itemCertificationCost,
+            allocatedFixedCost: itemFixedCost,
             allocatedInsurance,
             itemLandedCost,
             itemMargin,
@@ -389,6 +403,7 @@ const performDDPCalculation = (inputItems, settings, overrides) => {
             totalQatarChargesQar,
             totalQatarChargesUsd,
             certificationCost,
+            fixedCostTotal,
             landedCostBeforeMargin,
             profitMargin,
             commission,
