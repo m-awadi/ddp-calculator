@@ -67,7 +67,7 @@ export function useQuotationHistory() {
             summary: {
                 itemCount: items.filter(i => i.quantity > 0 && i.unitPrice > 0).length,
                 totalCBM: items.reduce((sum, item) => sum + (item.cbmPerUnit * item.quantity), 0),
-                ddpTotal: results?.totals?.ddpTotal || 0,
+                ddpTotal: results?.costs?.ddpTotal || 0,
                 currency: 'USD',
             }
         };

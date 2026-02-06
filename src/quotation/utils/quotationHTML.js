@@ -172,6 +172,15 @@ export const generateQuotationHTML = (data) => {
             max-width: 300px;
             max-height: 300px;
             object-fit: contain;
+            display: block;
+            margin: 4px auto;
+        }
+
+        .images-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
         }
 
         .cert-cell {
@@ -298,11 +307,15 @@ export const generateQuotationHTML = (data) => {
                     const oneTimeCost = parseFloat(item.oneTimeCost) || 0;
                     const totalItemAddons = certCost + labCost + oneTimeCost;
                     const oneTimeDesc = item.oneTimeCostDescription || 'One-Time';
+                    // Support both legacy single image and new multi-image array
+                    const images = item.images && item.images.length > 0 ? item.images : (item.image ? [item.image] : []);
+                    // Escape HTML and preserve newlines in description
+                    const descriptionHtml = (item.description || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
                     return `
                     <tr>
                         <td>${index + 1}</td>
-                        ${showPictureColumn ? `<td>${item.image ? `<img src="${item.image}" class="item-image" alt="Product">` : ''}</td>` : ''}
-                        <td class="description">${item.description || ''}</td>
+                        ${showPictureColumn ? `<td>${images.length > 0 ? `<div class="images-container">${images.map((img, imgIdx) => `<img src="${img}" class="item-image" alt="Product ${imgIdx + 1}">`).join('')}</div>` : ''}</td>` : ''}
+                        <td class="description">${descriptionHtml}</td>
                         <td>${item.quantity}</td>
                         <td>$${item.price.toFixed(2)}</td>
                         <td>$${(item.quantity * item.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>

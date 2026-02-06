@@ -11,9 +11,10 @@ import { generatePDFReport } from '../utils/modernReportGenerator';
  *  previewResults?: any;
  *  customsPreviewEnabled?: boolean;
  *  reportName?: string;
+ *  manufacturerName?: string;
  * }} props
  */
-const ResultsPanel = ({ results, items, settings, previewResults = null, customsPreviewEnabled = false, reportName = '' }) => {
+const ResultsPanel = ({ results, items, settings, previewResults = null, customsPreviewEnabled = false, reportName = '', manufacturerName = '' }) => {
     if (!results) return null;
 
     const { summary, costs, itemBreakdowns, rates } = results;
@@ -22,15 +23,12 @@ const ResultsPanel = ({ results, items, settings, previewResults = null, customs
 
     const handleDownloadReport = async () => {
         try {
-            console.log('Generating modern PDF report...');
-            const doc = await generatePDFReport(results, items, settings, previewResults, reportName);
+            const doc = await generatePDFReport(results, items, settings, previewResults, reportName, manufacturerName);
             const timestamp = new Date().toISOString().slice(0, 10);
             const filename = `DDP-Report-Modern-${timestamp}.pdf`;
             doc.save(filename);
-            console.log('Modern PDF report generated successfully!');
         } catch (error) {
-            console.error('Error generating PDF report:', error);
-            alert('Error generating PDF report. Please check the console for details.');
+            alert('Error generating PDF report. Please try again.');
         }
     };
 

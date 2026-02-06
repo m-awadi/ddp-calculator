@@ -277,20 +277,31 @@ export const generateQuotationPDF = async (data) => {
             const picColumnIndex = showPictureColumn ? 1 : -1;
             if (showPictureColumn && data.column.index === picColumnIndex && data.row.index < items.length) {
                 const item = items[data.row.index];
-                if (item.image) {
+                // Support both legacy single image and new multi-image array
+                const images = item.images && item.images.length > 0 ? item.images : (item.image ? [item.image] : []);
+
+                if (images.length > 0) {
                     const cellX = data.cell.x;
                     const cellY = data.cell.y;
                     const cellWidth = data.cell.width;
                     const cellHeight = data.cell.height;
 
                     try {
-                        // Calculate image dimensions to fit and center (max 300x300)
-                        const maxImgSize = Math.min(cellWidth - 4, cellHeight - 4, 300);
-                        const imgSize = maxImgSize;
-                        const imgX = cellX + (cellWidth - imgSize) / 2;
-                        const imgY = cellY + (cellHeight - imgSize) / 2;
+                        // Calculate space for multiple images stacked vertically
+                        const imageCount = images.length;
+                        const totalGap = (imageCount - 1) * 2; // 2mm gap between images
+                        const availableHeight = cellHeight - 4 - totalGap;
+                        const maxImgHeight = Math.min(availableHeight / imageCount, cellWidth - 4);
 
-                        doc.addImage(item.image, 'JPEG', imgX, imgY, imgSize, imgSize);
+                        let currentY = cellY + 2;
+
+                        images.forEach((imgSrc, imgIdx) => {
+                            const imgSize = Math.min(maxImgHeight, cellWidth - 4);
+                            const imgX = cellX + (cellWidth - imgSize) / 2;
+
+                            doc.addImage(imgSrc, 'JPEG', imgX, currentY, imgSize, imgSize);
+                            currentY += imgSize + 2; // Move down for next image
+                        });
                     } catch (e) {
                         console.error('Error adding image:', e);
                     }

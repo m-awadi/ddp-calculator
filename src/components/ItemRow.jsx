@@ -85,7 +85,7 @@ const ItemRow = ({ item, index, onUpdate, onRemove, pricingMode = 'EXW' }) => {
             borderRadius: '8px',
             alignItems: 'start',
         }}>
-            {/* Description */}
+            {/* Description - textarea for multi-line support */}
             <div>
                 {index === 0 && (
                     <label style={{
@@ -100,11 +100,33 @@ const ItemRow = ({ item, index, onUpdate, onRemove, pricingMode = 'EXW' }) => {
                         Description
                     </label>
                 )}
-                <Input
-                    label={null}
+                <textarea
                     value={item.description}
-                    onChange={v => onUpdate(index, 'description', v)}
-                    placeholder="Product name"
+                    onChange={e => onUpdate(index, 'description', e.target.value)}
+                    placeholder="Product name or description (supports multiple lines)"
+                    rows="2"
+                    style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        background: 'var(--bg-input)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '6px',
+                        color: 'var(--text-primary)',
+                        fontSize: '14px',
+                        fontFamily: 'inherit',
+                        resize: 'vertical',
+                        minHeight: '42px',
+                        outline: 'none',
+                        transition: '0.2s',
+                    }}
+                    onFocus={(e) => {
+                        e.target.style.borderColor = 'var(--border-focus)';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                    }}
+                    onBlur={(e) => {
+                        e.target.style.borderColor = 'var(--border)';
+                        e.target.style.boxShadow = 'none';
+                    }}
                 />
             </div>
 

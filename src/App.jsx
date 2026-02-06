@@ -57,6 +57,7 @@ function App() {
     });
 
     const [reportName, setReportName] = useState('');
+    const [manufacturerName, setManufacturerName] = useState('');
 
     // Restore autosave on mount
     useEffect(() => {
@@ -73,6 +74,7 @@ function App() {
                     if (autosaved.overrides) setOverrides(autosaved.overrides);
                     if (autosaved.customsPreview) setCustomsPreview(autosaved.customsPreview);
                     if (autosaved.reportName) setReportName(autosaved.reportName);
+                    if (autosaved.manufacturerName) setManufacturerName(autosaved.manufacturerName);
                 }
             }
         }
@@ -89,11 +91,12 @@ function App() {
                 overrides,
                 customsPreview,
                 reportName,
+                manufacturerName,
             });
         }, 1000);
 
         return () => clearTimeout(timer);
-    }, [items, settings, overrides, customsPreview, reportName, historyLoaded, setAutosave]);
+    }, [items, settings, overrides, customsPreview, reportName, manufacturerName, historyLoaded, setAutosave]);
 
     // Item management
     const addItem = () => {
@@ -150,11 +153,9 @@ function App() {
     // Import/Export handlers
     const handleExport = () => {
         try {
-            downloadFormData(items, settings, overrides, customsPreview, reportName);
-            console.log('Form data exported successfully');
+            downloadFormData(items, settings, overrides, customsPreview, reportName, manufacturerName);
         } catch (error) {
-            console.error('Error exporting form data:', error);
-            alert('Error exporting form data. Please check the console for details.');
+            alert('Error exporting form data. Please try again.');
         }
     };
 
@@ -169,9 +170,8 @@ function App() {
             setOverrides(data.overrides);
             setCustomsPreview(data.customsPreview);
             setReportName(data.reportName || '');
-            console.log('Form data imported successfully');
+            setManufacturerName(data.manufacturerName || '');
         } catch (error) {
-            console.error('Error importing form data:', error);
             alert(`Error importing form data: ${error.message}`);
         }
 
@@ -189,6 +189,7 @@ function App() {
         if (data.overrides) setOverrides(data.overrides);
         if (data.customsPreview) setCustomsPreview(data.customsPreview);
         if (data.reportName) setReportName(data.reportName);
+        if (data.manufacturerName) setManufacturerName(data.manufacturerName);
     };
 
     const triggerImport = () => {
@@ -203,9 +204,10 @@ function App() {
             overrides,
             customsPreview,
             reportName,
+            manufacturerName,
             results,
         }, customName);
-    }, [items, settings, overrides, customsPreview, reportName, results, saveQuotation]);
+    }, [items, settings, overrides, customsPreview, reportName, manufacturerName, results, saveQuotation]);
 
     const handleLoadFromHistory = useCallback((id) => {
         const data = loadQuotation(id);
@@ -215,6 +217,7 @@ function App() {
             setOverrides(data.overrides || { seaFreightOverride: null, domesticChinaPerCbmOverride: null });
             setCustomsPreview(data.customsPreview || { enabled: false, invoiceCostOverride: null, shippingCostOverride: null });
             setReportName(data.reportName || '');
+            setManufacturerName(data.manufacturerName || '');
         }
     }, [loadQuotation]);
 
@@ -635,8 +638,19 @@ function App() {
                                     label="Report Name (Optional)"
                                     value={reportName}
                                     onChange={v => setReportName(v)}
-                                    placeholder="Supplier or customer name"
-                                    hint="Appears on PDF report for identification"
+                                    placeholder="Project or customer name"
+                                    hint="Appears as project name on PDF report"
+                                />
+                            </div>
+
+                            {/* Manufacturer Name */}
+                            <div>
+                                <Input
+                                    label="Manufacturer Name (Optional)"
+                                    value={manufacturerName}
+                                    onChange={v => setManufacturerName(v)}
+                                    placeholder="Supplier company name"
+                                    hint="Appears in PDF header (default: Arabian Trade Route)"
                                 />
                             </div>
                         </div>
@@ -709,6 +723,7 @@ function App() {
                             previewResults={previewResults}
                             customsPreviewEnabled={customsPreview.enabled}
                             reportName={reportName}
+                            manufacturerName={manufacturerName}
                         />
                     )}
                 </div>

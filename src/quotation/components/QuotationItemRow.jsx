@@ -14,12 +14,23 @@ const CERTIFICATION_TYPES = [
 ];
 
 const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn = true, showCertificationColumn = false }) => {
-    const [imagePreview, setImagePreview] = useState(item.image || null);
+    // Support both legacy single image and new multi-image array
+    const getInitialImages = () => {
+        if (item.images && Array.isArray(item.images)) {
+            return item.images;
+        }
+        if (item.image) {
+            return [item.image];
+        }
+        return [];
+    };
+
+    const [imagePreviews, setImagePreviews] = useState(getInitialImages());
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef(null);
     const dropZoneRef = useRef(null);
 
-    const processImageFile = (file) => {
+    const processImageFile = (file, append = true) => {
         if (!file || !file.type.startsWith('image/')) return;
 
         const reader = new FileReader();
@@ -51,34 +62,57 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                 ctx.drawImage(img, 0, 0, width, height);
 
                 const resizedImage = canvas.toDataURL('image/jpeg', 0.85);
-                setImagePreview(resizedImage);
-                onUpdate(index, 'image', resizedImage);
+
+                setImagePreviews(prev => {
+                    const newImages = append ? [...prev, resizedImage] : [resizedImage];
+                    // Update both 'images' array and legacy 'image' field for backwards compatibility
+                    onUpdate(index, 'images', newImages);
+                    onUpdate(index, 'image', newImages[0] || null);
+                    return newImages;
+                });
             };
             img.src = event.target.result;
         };
         reader.readAsDataURL(file);
     };
 
+    const processMultipleFiles = (files) => {
+        // Process all image files from the list
+        const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+        imageFiles.forEach((file, idx) => {
+            // First file replaces if no existing images, subsequent files append
+            processImageFile(file, imagePreviews.length > 0 || idx > 0);
+        });
+    };
+
     const handleImageUpload = (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        processImageFile(file);
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+        processMultipleFiles(files);
     };
 
     const handlePaste = (e) => {
         const items = e.clipboardData?.items;
         if (!items) return;
 
+        // Collect all image files from clipboard
+        const imageFiles = [];
         for (let i = 0; i < items.length; i++) {
-            const item = items[i];
-            if (item.type.startsWith('image/')) {
-                const file = item.getAsFile();
+            const clipItem = items[i];
+            if (clipItem.type.startsWith('image/')) {
+                const file = clipItem.getAsFile();
                 if (file) {
-                    e.preventDefault();
-                    processImageFile(file);
-                    break;
+                    imageFiles.push(file);
                 }
             }
+        }
+
+        if (imageFiles.length > 0) {
+            e.preventDefault();
+            // Append all pasted images to existing ones
+            imageFiles.forEach(file => {
+                processImageFile(file, true);
+            });
         }
     };
 
@@ -101,13 +135,25 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
 
         const files = e.dataTransfer?.files;
         if (files && files.length > 0) {
-            const file = files[0];
-            processImageFile(file);
+            processMultipleFiles(files);
         }
     };
 
-    const removeImage = () => {
-        setImagePreview(null);
+    const removeImage = (imageIndex) => {
+        setImagePreviews(prev => {
+            const newImages = prev.filter((_, i) => i !== imageIndex);
+            onUpdate(index, 'images', newImages);
+            onUpdate(index, 'image', newImages[0] || null);
+            return newImages;
+        });
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    const removeAllImages = () => {
+        setImagePreviews([]);
+        onUpdate(index, 'images', []);
         onUpdate(index, 'image', null);
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
@@ -132,7 +178,7 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                 <td style={{
                     padding: '12px 8px',
                     width: '320px',
-                    verticalAlign: 'middle'
+                    verticalAlign: 'top'
                 }}>
                     <div
                         ref={dropZoneRef}
@@ -143,33 +189,27 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                         tabIndex={0}
                         style={{
                             width: '310px',
-                            height: '310px',
+                            minHeight: '310px',
                             border: `2px dashed ${isDragging ? QUOTATION_COLORS.primary : QUOTATION_COLORS.textMuted}40`,
                             borderRadius: '8px',
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
-                            justifyContent: 'center',
+                            justifyContent: imagePreviews.length > 0 ? 'flex-start' : 'center',
                             background: isDragging ? `${QUOTATION_COLORS.primary}10` : QUOTATION_COLORS.white,
                             position: 'relative',
                             margin: '0 auto',
                             transition: 'all 0.2s ease',
-                            outline: 'none'
+                            outline: 'none',
+                            padding: imagePreviews.length > 0 ? '8px' : '0',
+                            gap: '8px'
                         }}
                     >
-                        {imagePreview ? (
+                        {imagePreviews.length > 0 ? (
                             <>
-                                <img
-                                    src={imagePreview}
-                                    alt="Product"
-                                    style={{
-                                        maxWidth: '300px',
-                                        maxHeight: '300px',
-                                        objectFit: 'contain'
-                                    }}
-                                />
+                                {/* Clear all button */}
                                 <button
-                                    onClick={removeImage}
+                                    onClick={removeAllImages}
                                     style={{
                                         position: 'absolute',
                                         top: '4px',
@@ -177,18 +217,101 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                                         background: QUOTATION_COLORS.primary,
                                         color: 'white',
                                         border: 'none',
-                                        borderRadius: '50%',
-                                        width: '24px',
-                                        height: '24px',
+                                        borderRadius: '4px',
+                                        padding: '4px 8px',
                                         cursor: 'pointer',
-                                        fontSize: '14px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center'
+                                        fontSize: '11px',
+                                        fontWeight: '500',
+                                        zIndex: 10
                                     }}
                                 >
-                                    ✕
+                                    Clear All
                                 </button>
+
+                                {/* Images stacked vertically */}
+                                {imagePreviews.map((imgSrc, imgIndex) => (
+                                    <div
+                                        key={imgIndex}
+                                        style={{
+                                            position: 'relative',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                        }}
+                                    >
+                                        <img
+                                            src={imgSrc}
+                                            alt={`Product ${imgIndex + 1}`}
+                                            style={{
+                                                maxWidth: '290px',
+                                                maxHeight: '290px',
+                                                objectFit: 'contain',
+                                                borderRadius: '4px'
+                                            }}
+                                        />
+                                        <button
+                                            onClick={() => removeImage(imgIndex)}
+                                            style={{
+                                                position: 'absolute',
+                                                top: '2px',
+                                                right: '2px',
+                                                background: '#EF4444',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '50%',
+                                                width: '20px',
+                                                height: '20px',
+                                                cursor: 'pointer',
+                                                fontSize: '12px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center'
+                                            }}
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                ))}
+
+                                {/* Add more images button */}
+                                <div style={{
+                                    marginTop: '8px',
+                                    paddingTop: '8px',
+                                    borderTop: `1px dashed ${QUOTATION_COLORS.textMuted}40`,
+                                    width: '100%',
+                                    textAlign: 'center'
+                                }}>
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        multiple
+                                        onChange={handleImageUpload}
+                                        style={{ display: 'none' }}
+                                    />
+                                    <button
+                                        onClick={() => fileInputRef.current?.click()}
+                                        style={{
+                                            padding: '6px 12px',
+                                            background: `${QUOTATION_COLORS.primary}20`,
+                                            color: QUOTATION_COLORS.primary,
+                                            border: `1px dashed ${QUOTATION_COLORS.primary}`,
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            fontSize: '11px',
+                                            fontWeight: '500'
+                                        }}
+                                    >
+                                        + Add More Images
+                                    </button>
+                                    <div style={{
+                                        marginTop: '4px',
+                                        fontSize: '10px',
+                                        color: QUOTATION_COLORS.textMuted
+                                    }}>
+                                        Or paste (Ctrl+V)
+                                    </div>
+                                </div>
                             </>
                         ) : (
                             <>
@@ -196,6 +319,7 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                                     ref={fileInputRef}
                                     type="file"
                                     accept="image/*"
+                                    multiple
                                     onChange={handleImageUpload}
                                     style={{ display: 'none' }}
                                 />
@@ -206,7 +330,7 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                                         fontWeight: '600',
                                         textAlign: 'center'
                                     }}>
-                                        Drop image here
+                                        Drop image(s) here
                                     </div>
                                 ) : (
                                     <>
@@ -223,7 +347,7 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                                                 fontWeight: '500'
                                             }}
                                         >
-                                            Upload Image
+                                            Upload Image(s)
                                         </button>
                                         <span style={{
                                             marginTop: '8px',
@@ -238,7 +362,7 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                                             fontSize: '11px',
                                             color: QUOTATION_COLORS.textMuted
                                         }}>
-                                            Max 300x300px
+                                            Multiple images supported
                                         </span>
                                     </>
                                 )}
@@ -258,11 +382,13 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                         width: '100%',
                         minHeight: '80px',
                         padding: '8px',
-                        border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                        border: `1px solid ${QUOTATION_COLORS.inputBorder || QUOTATION_COLORS.textMuted}40`,
                         borderRadius: '6px',
                         fontSize: '14px',
                         fontFamily: 'inherit',
-                        resize: 'vertical'
+                        resize: 'vertical',
+                        backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
+                        color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark
                     }}
                 />
             </td>
@@ -278,35 +404,39 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                     style={{
                         width: '100%',
                         padding: '8px',
-                        border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                        border: `1px solid ${QUOTATION_COLORS.inputBorder || QUOTATION_COLORS.textMuted}40`,
                         borderRadius: '6px',
                         fontSize: '14px',
-                        textAlign: 'right'
+                        textAlign: 'right',
+                        backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
+                        color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark
                     }}
                 />
             </td>
 
-            {/* Price */}
+            {/* Price - supports fractional costs like 0.084 */}
             <td style={{ padding: '12px 8px', width: '140px' }}>
                 <input
                     type="number"
                     value={item.price}
                     onChange={(e) => onUpdate(index, 'price', parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
+                    placeholder="0.0000"
                     min="0"
-                    step="0.01"
+                    step="0.0001"
                     style={{
                         width: '100%',
                         padding: '8px',
-                        border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                        border: `1px solid ${QUOTATION_COLORS.inputBorder || QUOTATION_COLORS.textMuted}40`,
                         borderRadius: '6px',
                         fontSize: '14px',
-                        textAlign: 'right'
+                        textAlign: 'right',
+                        backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
+                        color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark
                     }}
                 />
             </td>
 
-            {/* Total */}
+            {/* Total - supports up to 4 decimal places for fractional costs */}
             <td style={{
                 padding: '12px 8px',
                 width: '140px',
@@ -315,7 +445,7 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                 color: QUOTATION_COLORS.textDark,
                 fontSize: '14px'
             }}>
-                ${(item.quantity * item.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${(item.quantity * item.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
             </td>
 
             {/* Certification/Lab Test Costs (when enabled) */}
@@ -329,10 +459,11 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                             style={{
                                 width: '100%',
                                 padding: '6px 8px',
-                                border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                border: `1px solid ${QUOTATION_COLORS.inputBorder || QUOTATION_COLORS.textMuted}40`,
                                 borderRadius: '4px',
                                 fontSize: '12px',
-                                background: QUOTATION_COLORS.white
+                                backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
+                                color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark
                             }}
                         >
                             {CERTIFICATION_TYPES.map(type => (
@@ -361,10 +492,12 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                                 style={{
                                     flex: 1,
                                     padding: '6px 8px',
-                                    border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                    border: `1px solid ${QUOTATION_COLORS.inputBorder || QUOTATION_COLORS.textMuted}40`,
                                     borderRadius: '4px',
                                     fontSize: '12px',
-                                    textAlign: 'right'
+                                    textAlign: 'right',
+                                    backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
+                                    color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark
                                 }}
                             />
                             <span style={{ fontSize: '11px', color: QUOTATION_COLORS.textMuted }}>USD</span>
@@ -389,10 +522,12 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                                 style={{
                                     flex: 1,
                                     padding: '6px 8px',
-                                    border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                    border: `1px solid ${QUOTATION_COLORS.inputBorder || QUOTATION_COLORS.textMuted}40`,
                                     borderRadius: '4px',
                                     fontSize: '12px',
-                                    textAlign: 'right'
+                                    textAlign: 'right',
+                                    backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
+                                    color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark
                                 }}
                             />
                             <span style={{ fontSize: '11px', color: QUOTATION_COLORS.textMuted }}>USD</span>
@@ -422,10 +557,12 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                                     style={{
                                         flex: 1,
                                         padding: '6px 8px',
-                                        border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                        border: `1px solid ${QUOTATION_COLORS.inputBorder || QUOTATION_COLORS.textMuted}40`,
                                         borderRadius: '4px',
                                         fontSize: '12px',
-                                        textAlign: 'right'
+                                        textAlign: 'right',
+                                        backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
+                                        color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark
                                     }}
                                 />
                                 <span style={{ fontSize: '11px', color: QUOTATION_COLORS.textMuted }}>USD</span>
@@ -438,10 +575,11 @@ const QuotationItemRow = ({ item, index, onUpdate, onRemove, showPictureColumn =
                                 style={{
                                     width: '100%',
                                     padding: '4px 8px',
-                                    border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                    border: `1px solid ${QUOTATION_COLORS.inputBorder || QUOTATION_COLORS.textMuted}40`,
                                     borderRadius: '4px',
                                     fontSize: '11px',
-                                    color: QUOTATION_COLORS.textMuted
+                                    backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
+                                    color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark
                                 }}
                             />
                         </div>

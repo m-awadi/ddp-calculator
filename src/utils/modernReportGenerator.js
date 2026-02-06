@@ -74,7 +74,7 @@ class ModernPDFBuilder {
     }
 
     // Modern visual elements - centered layout like target
-    drawStructuredHeader(title, subtitle1, subtitle2, projectName, generatedDate, exchangeRate) {
+    drawStructuredHeader(title, subtitle1, subtitle2, projectName, generatedDate, exchangeRate, manufacturerName = '') {
         // Dark header band
         this.setFillColor(THEME.colors.darkGradient);
         this.doc.rect(0, 0, THEME.layout.pageWidth, THEME.layout.heroHeight, 'F');
@@ -88,10 +88,10 @@ class ModernPDFBuilder {
             .setFont('helvetica', 'bold', THEME.fonts.title);
         this.doc.text(title, centerX, headerY, { align: 'center' });
 
-        // Company subtitle - centered
+        // Company subtitle - centered (use manufacturer name if provided, otherwise Arabian Trade Route)
         headerY += 10;
         this.setFont('helvetica', 'normal', THEME.fonts.subtitle);
-        this.doc.text('Arabian Trade Route', centerX, headerY, { align: 'center' });
+        this.doc.text(manufacturerName || 'Arabian Trade Route', centerX, headerY, { align: 'center' });
 
         // Route info - centered
         headerY += 6;
@@ -360,7 +360,7 @@ class ModernPDFBuilder {
     }
 }
 
-export const generatePDFReport = async (results, items, settings, previewResults = null, reportName = '') => {
+export const generatePDFReport = async (results, items, settings, previewResults = null, reportName = '', manufacturerName = '') => {
     if (!results) return null;
 
     const { summary, costs, itemBreakdowns, rates } = results;
@@ -388,7 +388,8 @@ export const generatePDFReport = async (results, items, settings, previewResults
             'Qatar (Hamad Port)',
             reportName || 'ARTIVIO DESIGN INTERIOR',
             generatedDate,
-            exchangeRate
+            exchangeRate,
+            manufacturerName
         );
 
         // 2. Executive Summary with target template layout
@@ -435,6 +436,69 @@ export const generatePDFReport = async (results, items, settings, previewResults
             rows: tableRows,
             footer: tableFooter
         });
+
+        // 3b. Certifications & Fixed Costs breakdown (if any exist)
+        const itemsWithCerts = itemBreakdowns.filter(item =>
+            (item.certifications && item.certifications.length > 0) ||
+            (item.fixedCosts && item.fixedCosts.length > 0)
+        );
+
+        if (itemsWithCerts.length > 0) {
+            const certsHeight = 8 + itemsWithCerts.length * 20;
+            if (builder.needPageBreak(certsHeight)) {
+                builder.addPage();
+            }
+
+            builder.drawSectionPill('CERTIFICATIONS & FIXED COSTS', THEME.colors.sectionPurple);
+
+            itemsWithCerts.forEach((item, idx) => {
+                // Item header
+                builder.setFont('helvetica', 'bold', THEME.fonts.body)
+                    .setColor(THEME.colors.textDark);
+                builder.doc.text(`${item.description || `Item ${idx + 1}`}:`, builder.leftMargin + 8, builder.y);
+                builder.y += 6;
+
+                // Certifications
+                if (item.certifications && item.certifications.length > 0) {
+                    builder.setFont('helvetica', 'italic', THEME.fonts.small)
+                        .setColor(THEME.colors.textMuted);
+                    builder.doc.text('Certifications:', builder.leftMargin + 12, builder.y);
+                    builder.y += 5;
+
+                    builder.setFont('helvetica', 'normal', THEME.fonts.small)
+                        .setColor(THEME.colors.textDark);
+                    item.certifications.forEach(cert => {
+                        if (cert.name && cert.cost > 0) {
+                            builder.doc.text(`- ${cert.name}`, builder.leftMargin + 16, builder.y);
+                            builder.doc.text(formatCurrency(cert.cost), builder.leftMargin + builder.contentWidth - 10, builder.y, { align: 'right' });
+                            builder.y += 4;
+                        }
+                    });
+                }
+
+                // Fixed Costs
+                if (item.fixedCosts && item.fixedCosts.length > 0) {
+                    builder.setFont('helvetica', 'italic', THEME.fonts.small)
+                        .setColor(THEME.colors.textMuted);
+                    builder.doc.text('Fixed Costs (One-time):', builder.leftMargin + 12, builder.y);
+                    builder.y += 5;
+
+                    builder.setFont('helvetica', 'normal', THEME.fonts.small)
+                        .setColor(THEME.colors.textDark);
+                    item.fixedCosts.forEach(cost => {
+                        if (cost.name && cost.cost > 0) {
+                            builder.doc.text(`- ${cost.name}`, builder.leftMargin + 16, builder.y);
+                            builder.doc.text(formatCurrency(cost.cost), builder.leftMargin + builder.contentWidth - 10, builder.y, { align: 'right' });
+                            builder.y += 4;
+                        }
+                    });
+                }
+
+                builder.y += 4;
+            });
+
+            builder.y += 4;
+        }
 
         // 4. Calculation Settings (keep on same page if space allows)
         const settingsHeight = 35;
@@ -508,6 +572,7 @@ export const generatePDFReport = async (results, items, settings, previewResults
             ['Sea Freight', formatCurrency(costs.seaFreight)],
             ['Insurance (0.5% of CIF)', formatCurrency(costs.insurance)],
             ['Certification', formatCurrency(costs.certificationCost)],
+            ...(costs.fixedCostTotal > 0 ? [['Fixed Costs (One-time)', formatCurrency(costs.fixedCostTotal)]] : []),
             ['CIF Value', formatCurrency(costs.cifValue)]
         ];
 

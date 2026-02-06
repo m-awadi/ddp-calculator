@@ -19,6 +19,9 @@ describe('Import/Export Functionality', () => {
                 certifications: [
                     { name: 'CE', cost: 100 },
                     { name: 'FDA', cost: 200 }
+                ],
+                fixedCosts: [
+                    { name: 'Tooling', cost: 500 }
                 ]
             },
             {
@@ -28,7 +31,8 @@ describe('Import/Export Functionality', () => {
                 cbmPerUnit: 0.08,
                 weightPerUnit: 3,
                 cbmInputMode: 'perUnit',
-                certifications: []
+                certifications: [],
+                fixedCosts: []
             }
         ];
 
@@ -72,12 +76,20 @@ describe('Import/Export Functionality', () => {
             expect(data).toHaveProperty('customsPreview');
         });
 
-        it('should preserve all items data', () => {
+        it('should preserve all items data including fixedCosts', () => {
             const result = exportFormData(mockItems, mockSettings, mockOverrides, mockCustomsPreview);
             const data = JSON.parse(result);
             expect(data.items).toEqual(mockItems);
             expect(data.items.length).toBe(2);
             expect(data.items[0].certifications.length).toBe(2);
+            expect(data.items[0].fixedCosts.length).toBe(1);
+            expect(data.items[0].fixedCosts[0].name).toBe('Tooling');
+        });
+
+        it('should include manufacturerName in export', () => {
+            const result = exportFormData(mockItems, mockSettings, mockOverrides, mockCustomsPreview, 'Test Report', 'Test Manufacturer');
+            const data = JSON.parse(result);
+            expect(data.manufacturerName).toBe('Test Manufacturer');
         });
 
         it('should preserve all settings data', () => {
@@ -181,6 +193,27 @@ describe('Import/Export Functionality', () => {
             const result = importFormData(jsonString);
             expect(result.items[0].certifications).toEqual(mockItems[0].certifications);
             expect(result.items[0].certifications.length).toBe(2);
+        });
+
+        it('should preserve fixedCosts on import', () => {
+            const jsonString = exportFormData(mockItems, mockSettings, mockOverrides, mockCustomsPreview);
+            const result = importFormData(jsonString);
+            expect(result.items[0].fixedCosts).toEqual(mockItems[0].fixedCosts);
+            expect(result.items[0].fixedCosts.length).toBe(1);
+            expect(result.items[0].fixedCosts[0].name).toBe('Tooling');
+            expect(result.items[0].fixedCosts[0].cost).toBe(500);
+        });
+
+        it('should preserve manufacturerName on import', () => {
+            const jsonString = exportFormData(mockItems, mockSettings, mockOverrides, mockCustomsPreview, 'Test Report', 'Test Manufacturer');
+            const result = importFormData(jsonString);
+            expect(result.manufacturerName).toBe('Test Manufacturer');
+        });
+
+        it('should default manufacturerName to empty string if not present', () => {
+            const jsonString = exportFormData(mockItems, mockSettings, mockOverrides, mockCustomsPreview, 'Test Report');
+            const result = importFormData(jsonString);
+            expect(result.manufacturerName).toBe('');
         });
 
         it('should provide default values for missing optional fields', () => {

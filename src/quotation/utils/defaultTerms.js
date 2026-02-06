@@ -1,4 +1,23 @@
-export const QUOTATION_COLORS = {
+// Detect dark mode preference
+const isDarkMode = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+export const QUOTATION_COLORS = isDarkMode ? {
+    // Dark mode colors
+    primary: '#E8752F',      // Brighter Burnt Orange for dark mode
+    secondary: '#F0883A',    // Lighter Burnt Orange
+    navy: '#E8E8E8',         // Light text for dark backgrounds
+    coolGray: '#A0AEC0',     // Lighter gray for dark mode
+    lightGray: '#2D3748',    // Dark gray for cards
+    inputBackground: '#374151', // Dark input background
+    desertSand: '#1F2937',   // Dark card background
+    background: '#111827',   // Dark page background
+    white: '#1F2937',        // Dark card surface
+    textDark: '#F3F4F6',     // Light text for dark mode
+    textMuted: '#9CA3AF',    // Muted text for dark mode
+    inputText: '#F3F4F6',    // Light input text for dark mode
+    inputBorder: '#4B5563'   // Visible border in dark mode
+} : {
+    // Light mode colors (original)
     primary: '#D65A1F',      // Burnt Orange - Primary accent
     secondary: '#EC722D',    // Light Burnt Orange - Secondary accent
     navy: '#1B2B38',         // Navy Blue - Primary text, headings
@@ -9,7 +28,9 @@ export const QUOTATION_COLORS = {
     background: '#FFFDF7',   // Background White - Page background
     white: '#FFFFFF',        // Pure white for contrast
     textDark: '#1B2B38',     // Navy Blue for primary text
-    textMuted: '#6A7B8C'     // Cool Gray for secondary text
+    textMuted: '#6A7B8C',    // Cool Gray for secondary text
+    inputText: '#1B2B38',    // Dark input text for light mode
+    inputBorder: '#6A7B8C'   // Border color for light mode
 };
 
 export const DEFAULT_COMPANY_INFO = {

@@ -33,15 +33,18 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
             ? initialItems.map(item => ({
                 description: item.description || '',
                 quantity: item.quantity || 0,
-                price: item.ddpPerUnit ? parseFloat(item.ddpPerUnit.toFixed(2)) : 0,
+                // Support small fractional prices (e.g., 0.084) - use up to 4 decimal places
+                price: item.ddpPerUnit != null ? parseFloat(Number(item.ddpPerUnit).toFixed(4)) : (item.price != null ? parseFloat(Number(item.price).toFixed(4)) : 0),
                 image: null,
-                certificationCost: 0,
-                labTestCost: 0,
-                certificationType: '',
-                oneTimeCost: 0,
-                oneTimeCostDescription: ''
+                images: [],
+                // Carry over certification and one-time costs from DDP calculator
+                certificationCost: item.certificationCost || 0,
+                labTestCost: item.labTestCost || 0,
+                certificationType: item.certificationType || '',
+                oneTimeCost: item.oneTimeCost || 0,
+                oneTimeCostDescription: item.oneTimeCostDescription || ''
             }))
-            : [{ description: '', quantity: 0, price: 0, image: null, certificationCost: 0, labTestCost: 0, certificationType: '', oneTimeCost: 0, oneTimeCostDescription: '' }]
+            : [{ description: '', quantity: 0, price: 0, image: null, images: [], certificationCost: 0, labTestCost: 0, certificationType: '', oneTimeCost: 0, oneTimeCostDescription: '' }]
     );
 
     const [companyInfo, setCompanyInfo] = useState({ ...DEFAULT_COMPANY_INFO });
@@ -67,7 +70,7 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
     };
 
     const addItem = () => {
-        setItems([...items, { description: '', quantity: 0, price: 0, image: null, certificationCost: 0, labTestCost: 0, certificationType: '', oneTimeCost: 0, oneTimeCostDescription: '' }]);
+        setItems([...items, { description: '', quantity: 0, price: 0, image: null, images: [], certificationCost: 0, labTestCost: 0, certificationType: '', oneTimeCost: 0, oneTimeCostDescription: '' }]);
     };
 
     const removeItem = (index) => {
@@ -337,9 +340,11 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                 placeholder="Company Name"
                                 style={{
                                     padding: '10px',
-                                    border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                    border: `1px solid ${QUOTATION_COLORS.inputBorder || QUOTATION_COLORS.textMuted}40`,
                                     borderRadius: '6px',
-                                    fontSize: '14px'
+                                    fontSize: '14px',
+                                    backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
+                                    color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark
                                 }}
                             />
                             <input
@@ -348,9 +353,11 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                 onChange={(e) => setQuotationDate(e.target.value)}
                                 style={{
                                     padding: '10px',
-                                    border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                    border: `1px solid ${QUOTATION_COLORS.inputBorder || QUOTATION_COLORS.textMuted}40`,
                                     borderRadius: '6px',
-                                    fontSize: '14px'
+                                    fontSize: '14px',
+                                    backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
+                                    color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark
                                 }}
                             />
                             <textarea
@@ -360,11 +367,13 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                 rows="3"
                                 style={{
                                     padding: '10px',
-                                    border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                    border: `1px solid ${QUOTATION_COLORS.inputBorder || QUOTATION_COLORS.textMuted}40`,
                                     borderRadius: '6px',
                                     fontSize: '14px',
                                     fontFamily: 'inherit',
-                                    gridColumn: '1 / -1'
+                                    gridColumn: '1 / -1',
+                                    backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
+                                    color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark
                                 }}
                             />
                             <input
@@ -374,9 +383,11 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                 placeholder="Email"
                                 style={{
                                     padding: '10px',
-                                    border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                    border: `1px solid ${QUOTATION_COLORS.inputBorder || QUOTATION_COLORS.textMuted}40`,
                                     borderRadius: '6px',
-                                    fontSize: '14px'
+                                    fontSize: '14px',
+                                    backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
+                                    color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark
                                 }}
                             />
                         </div>
@@ -399,9 +410,11 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                         style={{
                                             width: '80px',
                                             padding: '6px 8px',
-                                            border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                            border: `1px solid ${QUOTATION_COLORS.inputBorder || QUOTATION_COLORS.textMuted}40`,
                                             borderRadius: '4px',
-                                            fontSize: '13px'
+                                            fontSize: '13px',
+                                            backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
+                                            color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark
                                         }}
                                     />
                                 </label>
@@ -542,7 +555,8 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                             borderRadius: '6px',
                                             fontSize: '14px',
                                             fontWeight: '600',
-                                            color: QUOTATION_COLORS.primary
+                                            color: QUOTATION_COLORS.primary,
+                                            backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white
                                         }}
                                     />
                                     <button
@@ -616,10 +630,12 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                                 style={{
                                                     flex: 1,
                                                     padding: '8px',
-                                                    border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                                    border: `1px solid ${QUOTATION_COLORS.inputBorder || QUOTATION_COLORS.textMuted}40`,
                                                     borderRadius: '6px',
                                                     fontSize: '13px',
-                                                    fontWeight: '600'
+                                                    fontWeight: '600',
+                                                    backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
+                                                    color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark
                                                 }}
                                             />
                                             <button
@@ -684,11 +700,13 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                                     style={{
                                                         flex: 1,
                                                         padding: '6px',
-                                                        border: `1px solid ${QUOTATION_COLORS.textMuted}40`,
+                                                        border: `1px solid ${QUOTATION_COLORS.inputBorder || QUOTATION_COLORS.textMuted}40`,
                                                         borderRadius: '4px',
                                                         fontSize: '12px',
                                                         fontFamily: 'inherit',
-                                                        resize: 'vertical'
+                                                        resize: 'vertical',
+                                                        backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
+                                                        color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark
                                                     }}
                                                 />
                                                 <button

@@ -25,7 +25,8 @@ export const generateTemplate = () => {
                     weightPerUnit: 'Weight per unit in kilograms',
                     cbmInputMode: 'perUnit or total',
                     weightInputMode: 'perUnit or total',
-                    certifications: 'Array of {name: string, cost: number} for product certifications'
+                    certifications: 'Array of {name: string, cost: number} for product certifications',
+                    fixedCosts: 'Array of {name: string, cost: number} for one-time costs (tooling, setup, samples)'
                 },
                 settings: {
                     pricingMode: 'EXW, FOB, or CIF',
@@ -35,10 +36,12 @@ export const generateTemplate = () => {
                     commissionRate: 'Commission rate value',
                     commissionMode: 'percentage or fixed'
                 },
-                reportName: 'Optional supplier or customer name for report identification'
+                reportName: 'Optional project/customer name for report identification',
+                manufacturerName: 'Optional manufacturer/supplier name for PDF header'
             }
         },
         reportName: 'ABC Trading Company',
+        manufacturerName: 'Guangzhou Manufacturing Co., Ltd.',
         items: [
             {
                 description: 'Sample Product A',
@@ -52,6 +55,10 @@ export const generateTemplate = () => {
                 certifications: [
                     { name: 'CE Certification', cost: 150 },
                     { name: 'FDA Approval', cost: 200 }
+                ],
+                fixedCosts: [
+                    { name: 'Tooling', cost: 500 },
+                    { name: 'Sample Production', cost: 100 }
                 ]
             },
             {
@@ -63,7 +70,8 @@ export const generateTemplate = () => {
                 weightPerUnit: 3,
                 cbmInputMode: 'perUnit',
                 weightInputMode: 'perUnit',
-                certifications: []
+                certifications: [],
+                fixedCosts: []
             }
         ],
         settings: {
@@ -114,13 +122,15 @@ export const downloadTemplate = (filename = 'DDP-Calculator-Template.json') => {
  * @param {Object} overrides - The overrides object
  * @param {Object} customsPreview - The customs preview settings
  * @param {string} reportName - Optional report name
+ * @param {string} manufacturerName - Optional manufacturer/supplier name
  * @returns {string} JSON string of all data
  */
-export const exportFormData = (items, settings, overrides, customsPreview, reportName = '') => {
+export const exportFormData = (items, settings, overrides, customsPreview, reportName = '', manufacturerName = '') => {
     const data = {
         version: '1.0',
         timestamp: new Date().toISOString(),
         reportName: reportName,
+        manufacturerName: manufacturerName,
         items: items,
         settings: settings,
         overrides: overrides,
@@ -137,10 +147,11 @@ export const exportFormData = (items, settings, overrides, customsPreview, repor
  * @param {Object} overrides - The overrides object
  * @param {Object} customsPreview - The customs preview settings
  * @param {string} reportName - Optional report name
+ * @param {string} manufacturerName - Optional manufacturer/supplier name
  * @param {string} filename - Optional filename
  */
-export const downloadFormData = (items, settings, overrides, customsPreview, reportName = '', filename = null) => {
-    const jsonString = exportFormData(items, settings, overrides, customsPreview, reportName);
+export const downloadFormData = (items, settings, overrides, customsPreview, reportName = '', manufacturerName = '', filename = null) => {
+    const jsonString = exportFormData(items, settings, overrides, customsPreview, reportName, manufacturerName);
     const blob = new Blob([jsonString], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
 
@@ -220,7 +231,8 @@ export const importFormData = (jsonString) => {
             },
             overrides: data.overrides || {},
             customsPreview: data.customsPreview || { enabled: false, invoiceCostOverride: null, shippingCostOverride: null },
-            reportName: data.reportName || ''
+            reportName: data.reportName || '',
+            manufacturerName: data.manufacturerName || ''
         };
     } catch (error) {
         console.error('Error importing form data:', error);

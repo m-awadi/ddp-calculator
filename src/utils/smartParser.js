@@ -17,12 +17,17 @@ DATE EXTRACTION RULES:
 - Detect the currency. If NOT USD, convert it to USD using the provided exchange rate or your best knowledge of current rates if not provided (assume 1 USD = 3.65 QAR, 1 USD = 7.2 CNY for example, but prefer converting everything to USD).
 - Detect Incoterms (EXW, FOB, or CIF). If not explicit, infer from context (e.g. "Ex-works", "FOB Shenzhen", "CIF Doha"). Default to EXW if unsure.
 
+**MULTI-LINE DESCRIPTIONS**:
+- **CRITICAL**: Preserve line breaks in item descriptions! If a description spans multiple lines or contains specifications on separate lines, include newline characters (\\n) in the description string.
+- Example: "Product Name\\nModel: ABC-123\\nColor: Red" - this preserves the multi-line format.
+- Do NOT flatten multi-line descriptions into a single line.
+
 OUTPUT FORMAT:
 You must output PURE JSON matching this schema exactly:
 {
   "items": [
     {
-      "description": "Item description",
+      "description": "Item description\\nWith multiple lines\\nPreserved",
       "quantity": 100,
       "unitType": "pcs",
       "unitPrice": 10.50, // IN USD
@@ -44,6 +49,7 @@ IMPORTANT:
 - If dimensions are in cm, convert to meters for calculation (L*W*H).
 - If weight is total, divide by quantity.
 - Return ONLY the JSON object. No markdown formatting.
+- PRESERVE newlines in descriptions using \\n character.
 `;
 
 /**
