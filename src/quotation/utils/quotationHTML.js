@@ -19,8 +19,20 @@ export const generateQuotationHTML = (data) => {
         totalLabTestCost = 0,
         totalCertLabCost = 0,
         totalOneTimeCost = 0,
-        totalAddonsCost = 0
+        totalAddonsCost = 0,
+        showQAR = false,
+        qarExchangeRate = 3.65
     } = data;
+
+    // Helper function to format currency with optional QAR
+    const formatCurrency = (usdAmount) => {
+        const usdFormatted = '$' + usdAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (showQAR) {
+            const qarAmount = usdAmount * qarExchangeRate;
+            return `${usdFormatted}<br><span class="qar-amount">(${qarAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} QAR)</span>`;
+        }
+        return usdFormatted;
+    };
 
     const formattedDate = new Date(date).toLocaleDateString('en-GB', {
         day: 'numeric',
@@ -79,8 +91,8 @@ export const generateQuotationHTML = (data) => {
 
         body {
             font-family: 'Roboto', sans-serif;
-            background: ${QUOTATION_COLORS.background};
-            color: ${QUOTATION_COLORS.textDark};
+            background: #FFFFFF;
+            color: #1B2B38;
             line-height: 1.6;
             margin: 0;
             padding: 0;
@@ -90,11 +102,12 @@ export const generateQuotationHTML = (data) => {
             width: 210mm;
             min-height: 297mm;
             margin: 0 auto;
-            background: white;
+            background: #FFFFFF;
             position: relative;
             page-break-after: always;
             padding: 15mm 10mm;
             box-shadow: none;
+            color: #1B2B38;
         }
 
         .header {
@@ -117,13 +130,13 @@ export const generateQuotationHTML = (data) => {
         .company-name {
             font-size: 20px;
             font-weight: bold;
-            color: ${QUOTATION_COLORS.primary};
+            color: #D65A1F;
             margin-bottom: 5px;
         }
 
         .company-details {
             font-size: 11px;
-            color: #555;
+            color: #333333;
             line-height: 1.4;
         }
 
@@ -131,7 +144,7 @@ export const generateQuotationHTML = (data) => {
             text-align: center;
             font-size: 24px;
             font-weight: bold;
-            color: ${QUOTATION_COLORS.primary};
+            color: #D65A1F;
             margin: 20px 0;
             font-family: 'Roboto', sans-serif;
         }
@@ -145,8 +158,8 @@ export const generateQuotationHTML = (data) => {
         }
 
         th {
-            background: ${QUOTATION_COLORS.primary};
-            color: white;
+            background: #D65A1F;
+            color: #FFFFFF;
             padding: 12px 8px;
             text-align: center;
             font-size: 12px;
@@ -160,6 +173,7 @@ export const generateQuotationHTML = (data) => {
             text-align: center;
             font-size: 11px;
             font-family: 'Roboto', sans-serif;
+            color: #1B2B38;
         }
 
         td.description {
@@ -192,25 +206,45 @@ export const generateQuotationHTML = (data) => {
 
         .cert-type {
             font-weight: bold;
-            color: ${QUOTATION_COLORS.primary};
+            color: #D65A1F;
             margin-bottom: 4px;
         }
 
         .cert-detail {
-            color: #555;
+            color: #333333;
             margin: 2px 0;
         }
 
         .total-row {
-            background: ${QUOTATION_COLORS.primary};
-            color: white;
+            background: #D65A1F;
+            color: #FFFFFF;
             font-weight: bold;
         }
 
+        .total-row td {
+            color: #FFFFFF;
+        }
+
         .grand-total-row {
-            background: ${QUOTATION_COLORS.secondary};
-            color: white;
+            background: #EC722D;
+            color: #FFFFFF;
             font-weight: bold;
+        }
+
+        .grand-total-row td {
+            color: #FFFFFF;
+        }
+
+        .qar-amount {
+            font-size: 10px;
+            color: #666666;
+            display: block;
+        }
+
+        .total-row .qar-amount,
+        .grand-total-row .qar-amount {
+            color: #FFFFFF;
+            opacity: 0.9;
         }
 
         .terms-section {
@@ -222,7 +256,7 @@ export const generateQuotationHTML = (data) => {
         .terms-title {
             font-size: 14px;
             font-weight: bold;
-            color: ${QUOTATION_COLORS.primary};
+            color: #D65A1F;
             margin-bottom: 10px;
         }
 
@@ -230,6 +264,7 @@ export const generateQuotationHTML = (data) => {
             margin: 8px 0 8px 20px;
             font-size: 12px;
             line-height: 1.8;
+            color: #1B2B38;
         }
 
         /* Bank details now handled by custom blocks, but keeping class just in case users add it manually or for legacy support */
@@ -265,10 +300,37 @@ export const generateQuotationHTML = (data) => {
             body {
                 print-color-adjust: exact;
                 -webkit-print-color-adjust: exact;
+                background: #FFFFFF !important;
+                color: #1B2B38 !important;
             }
             .page {
                 margin: 0;
                 page-break-after: always;
+                background: #FFFFFF !important;
+                color: #1B2B38 !important;
+            }
+            td {
+                color: #1B2B38 !important;
+            }
+            .total-row td,
+            .grand-total-row td {
+                color: #FFFFFF !important;
+            }
+            .company-details {
+                color: #333333 !important;
+            }
+            .term-item {
+                color: #1B2B38 !important;
+            }
+            .cert-detail {
+                color: #333333 !important;
+            }
+            .qar-amount {
+                color: #666666 !important;
+            }
+            .total-row .qar-amount,
+            .grand-total-row .qar-amount {
+                color: #FFFFFF !important;
             }
         }
     </style>
@@ -317,8 +379,8 @@ export const generateQuotationHTML = (data) => {
                         ${showPictureColumn ? `<td>${images.length > 0 ? `<div class="images-container">${images.map((img, imgIdx) => `<img src="${img}" class="item-image" alt="Product ${imgIdx + 1}">`).join('')}</div>` : ''}</td>` : ''}
                         <td class="description">${descriptionHtml}</td>
                         <td>${item.quantity}</td>
-                        <td>$${item.price.toFixed(2)}</td>
-                        <td>$${(item.quantity * item.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td>${formatCurrency(item.price)}</td>
+                        <td>${formatCurrency(item.quantity * item.price)}</td>
                         ${showCertificationColumn ? `
                         <td class="cert-cell">
                             ${totalItemAddons > 0 ? `
@@ -334,13 +396,13 @@ export const generateQuotationHTML = (data) => {
                 `}).join('')}
                 <tr class="total-row">
                     <td colspan="${showPictureColumn ? '5' : '4'}">${totalAddonsCost > 0 ? 'Product Total' : 'Total'}</td>
-                    <td>$${totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    ${showCertificationColumn ? `<td>${totalAddonsCost > 0 ? '$' + totalAddonsCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}</td>` : ''}
+                    <td>${formatCurrency(totalUSD)}</td>
+                    ${showCertificationColumn ? `<td>${totalAddonsCost > 0 ? formatCurrency(totalAddonsCost) : ''}</td>` : ''}
                 </tr>
                 ${totalAddonsCost > 0 ? `
                 <tr class="grand-total-row">
                     <td colspan="${showPictureColumn ? (showCertificationColumn ? '6' : '5') : (showCertificationColumn ? '5' : '4')}">Grand Total (Products + Add-ons)</td>
-                    <td colspan="${showCertificationColumn ? '2' : '1'}">$${(totalUSD + totalAddonsCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td colspan="${showCertificationColumn ? '2' : '1'}">${formatCurrency(totalUSD + totalAddonsCost)}</td>
                 </tr>
                 ` : ''}
             </tbody>

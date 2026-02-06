@@ -27,6 +27,8 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
     const [quotationDate, setQuotationDate] = useState(new Date().toISOString().slice(0, 10));
     const [showPictureColumn, setShowPictureColumn] = useState(true);
     const [showCertificationColumn, setShowCertificationColumn] = useState(true);
+    const [showQAR, setShowQAR] = useState(false);
+    const [qarExchangeRate, setQarExchangeRate] = useState(3.65);
     const [quantityUnit, setQuantityUnit] = useState('pcs');
     const [items, setItems] = useState(
         initialItems.length > 0
@@ -208,7 +210,9 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                 totalLabTestCost,
                 totalCertLabCost,
                 totalOneTimeCost,
-                totalAddonsCost
+                totalAddonsCost,
+                showQAR,
+                qarExchangeRate
             });
         } catch (error) {
             console.error('Error generating PDF:', error);
@@ -232,7 +236,9 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                 totalLabTestCost,
                 totalCertLabCost,
                 totalOneTimeCost,
-                totalAddonsCost
+                totalAddonsCost,
+                showQAR,
+                qarExchangeRate
             });
         } catch (error) {
             console.error('Error generating print preview:', error);
@@ -436,6 +442,36 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                     />
                                     Show Cert/Lab Test Costs
                                 </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: QUOTATION_COLORS.textDark, cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={showQAR}
+                                        onChange={(e) => setShowQAR(e.target.checked)}
+                                        style={{ cursor: 'pointer' }}
+                                    />
+                                    Show QAR Prices
+                                </label>
+                                {showQAR && (
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: QUOTATION_COLORS.textDark }}>
+                                        <span>Rate:</span>
+                                        <input
+                                            type="number"
+                                            value={qarExchangeRate}
+                                            onChange={(e) => setQarExchangeRate(parseFloat(e.target.value) || 3.65)}
+                                            step="0.01"
+                                            min="0.01"
+                                            style={{
+                                                width: '70px',
+                                                padding: '6px 8px',
+                                                border: `1px solid ${QUOTATION_COLORS.inputBorder || QUOTATION_COLORS.textMuted}40`,
+                                                borderRadius: '4px',
+                                                fontSize: '13px',
+                                                backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
+                                                color: QUOTATION_COLORS.inputText || QUOTATION_COLORS.textDark
+                                            }}
+                                        />
+                                    </label>
+                                )}
                             </div>
                         </div>
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -470,10 +506,20 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                     </td>
                                     <td style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '14px', fontWeight: '700', textAlign: 'right' }}>
                                         ${totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        {showQAR && (
+                                            <div style={{ fontSize: '11px', opacity: 0.9 }}>
+                                                ({(totalUSD * qarExchangeRate).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} QAR)
+                                            </div>
+                                        )}
                                     </td>
                                     {showCertificationColumn && (
                                         <td style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '14px', fontWeight: '700', textAlign: 'right' }}>
                                             ${totalAddonsCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            {showQAR && totalAddonsCost > 0 && (
+                                                <div style={{ fontSize: '11px', opacity: 0.9 }}>
+                                                    ({(totalAddonsCost * qarExchangeRate).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} QAR)
+                                                </div>
+                                            )}
                                         </td>
                                     )}
                                     <td></td>
@@ -486,6 +532,11 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                                         </td>
                                         <td colSpan={showCertificationColumn ? "2" : "1"} style={{ padding: '12px 8px', color: QUOTATION_COLORS.white, fontSize: '14px', fontWeight: '700', textAlign: 'right' }}>
                                             ${(totalUSD + totalAddonsCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            {showQAR && (
+                                                <div style={{ fontSize: '11px', opacity: 0.9 }}>
+                                                    ({((totalUSD + totalAddonsCost) * qarExchangeRate).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} QAR)
+                                                </div>
+                                            )}
                                         </td>
                                         <td></td>
                                     </tr>

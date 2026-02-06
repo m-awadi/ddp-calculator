@@ -38,8 +38,20 @@ export const generateQuotationPDF = async (data) => {
         totalLabTestCost = 0,
         totalCertLabCost = 0,
         totalOneTimeCost = 0,
-        totalAddonsCost = 0
+        totalAddonsCost = 0,
+        showQAR = false,
+        qarExchangeRate = 3.65
     } = data;
+
+    // Helper function to format currency with optional QAR
+    const formatCurrency = (usdAmount) => {
+        const usdFormatted = '$' + usdAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (showQAR) {
+            const qarAmount = usdAmount * qarExchangeRate;
+            return `${usdFormatted}\n(${qarAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} QAR)`;
+        }
+        return usdFormatted;
+    };
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -132,8 +144,8 @@ export const generateQuotationPDF = async (data) => {
         row.push(
             item.description || '',
             item.quantity.toString(),
-            `$${item.price.toFixed(2)}`,
-            `$${(item.quantity * item.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            formatCurrency(item.price),
+            formatCurrency(item.quantity * item.price)
         );
         // Add certification column if enabled
         if (showCertificationColumn) {
@@ -180,7 +192,7 @@ export const generateQuotationPDF = async (data) => {
         }
     });
     totalRowData.push({
-        content: '$' + totalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        content: formatCurrency(totalUSD),
         styles: {
             fillColor: [primaryRGB.r, primaryRGB.g, primaryRGB.b],
             textColor: [255, 255, 255],
@@ -191,7 +203,7 @@ export const generateQuotationPDF = async (data) => {
     // Add certification total column if enabled
     if (showCertificationColumn) {
         totalRowData.push({
-            content: totalAddonsCost > 0 ? '$' + totalAddonsCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '',
+            content: totalAddonsCost > 0 ? formatCurrency(totalAddonsCost) : '',
             styles: {
                 fillColor: [primaryRGB.r, primaryRGB.g, primaryRGB.b],
                 textColor: [255, 255, 255],
@@ -216,7 +228,7 @@ export const generateQuotationPDF = async (data) => {
             }
         });
         grandTotalRow.push({
-            content: '$' + (totalUSD + totalAddonsCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            content: formatCurrency(totalUSD + totalAddonsCost),
             colSpan: showCertificationColumn ? 2 : 1,
             styles: {
                 fillColor: [secondaryRGB.r, secondaryRGB.g, secondaryRGB.b],
