@@ -257,12 +257,17 @@ export const generateQuotationPDF = async (data) => {
     if (showPictureColumn) {
         columnStyles[colIndex++] = { cellWidth: showCertificationColumn ? 50 : 60, halign: 'center' }; // PIC (smaller when cert column)
     }
-    columnStyles[colIndex++] = { cellWidth: showPictureColumn ? (showCertificationColumn ? 40 : 50) : 90 }; // Description
+    // Description column - enable linebreak overflow for multi-line text
+    columnStyles[colIndex++] = {
+        cellWidth: showPictureColumn ? (showCertificationColumn ? 40 : 50) : 90,
+        overflow: 'linebreak',  // Allow text to wrap to multiple lines
+        cellPadding: { top: 4, right: 4, bottom: 4, left: 4 }  // Add padding for wrapped text
+    };
     columnStyles[colIndex++] = { cellWidth: 20, halign: 'center' }; // Qty
     columnStyles[colIndex++] = { cellWidth: 22, halign: 'right' }; // Price
     columnStyles[colIndex++] = { cellWidth: 28, halign: 'right' }; // Total
     if (showCertificationColumn) {
-        columnStyles[colIndex++] = { cellWidth: 35, halign: 'left' }; // Cert/Lab Costs
+        columnStyles[colIndex++] = { cellWidth: 35, halign: 'left', overflow: 'linebreak' }; // Cert/Lab Costs
     }
 
     autoTable(doc, {

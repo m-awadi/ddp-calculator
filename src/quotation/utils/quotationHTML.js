@@ -180,6 +180,10 @@ export const generateQuotationHTML = (data) => {
             text-align: left;
             direction: ltr;
             font-weight: bold;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 200px; /* Prevent description from taking too much space */
+            white-space: pre-wrap; /* Preserve line breaks and wrap text */
         }
 
         .item-image {

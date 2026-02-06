@@ -444,19 +444,52 @@ export const generatePDFReport = async (results, items, settings, previewResults
         );
 
         if (itemsWithCerts.length > 0) {
-            const certsHeight = 8 + itemsWithCerts.length * 20;
-            if (builder.needPageBreak(certsHeight)) {
+            // Calculate a more accurate initial height estimate
+            // This is just for the section pill - individual items will check before rendering
+            const initialSectionHeight = 20; // Section pill height
+            if (builder.needPageBreak(initialSectionHeight)) {
                 builder.addPage();
             }
 
             builder.drawSectionPill('CERTIFICATIONS & FIXED COSTS', THEME.colors.sectionPurple);
 
             itemsWithCerts.forEach((item, idx) => {
-                // Item header
+                // Calculate estimated height for this item before rendering
+                const itemDescription = `${item.description || `Item ${idx + 1}`}:`;
+                const maxDescriptionWidth = builder.contentWidth - 16;
+
+                // Set font to calculate text wrapping accurately
+                builder.setFont('helvetica', 'bold', THEME.fonts.body);
+                const descriptionLines = builder.doc.splitTextToSize(itemDescription, maxDescriptionWidth);
+
+                // Estimate item height: description lines + certifications + fixed costs + spacing
+                const certCount = (item.certifications || []).filter(c => c.name && c.cost > 0).length;
+                const fixedCostCount = (item.fixedCosts || []).filter(c => c.name && c.cost > 0).length;
+                const estimatedItemHeight = (descriptionLines.length * 5) + 2 + // Description
+                    (certCount > 0 ? 5 + (certCount * 4) : 0) + // Certifications header + items
+                    (fixedCostCount > 0 ? 5 + (fixedCostCount * 4) : 0) + // Fixed costs header + items
+                    8; // Bottom spacing
+
+                // Check if we need a page break before this item
+                if (builder.needPageBreak(estimatedItemHeight)) {
+                    builder.addPage();
+                    // Re-draw section header on new page for continuity
+                    builder.setColor(THEME.colors.textMuted)
+                        .setFont('helvetica', 'italic', THEME.fonts.body);
+                    builder.doc.text('Certifications & Fixed Costs (continued)', builder.leftMargin, builder.y);
+                    builder.y += 8;
+                }
+
+                // Item header - render multi-line description properly
                 builder.setFont('helvetica', 'bold', THEME.fonts.body)
                     .setColor(THEME.colors.textDark);
-                builder.doc.text(`${item.description || `Item ${idx + 1}`}:`, builder.leftMargin + 8, builder.y);
-                builder.y += 6;
+
+                // Render each line of the description
+                descriptionLines.forEach((line, lineIdx) => {
+                    builder.doc.text(line, builder.leftMargin + 8, builder.y);
+                    builder.y += 5; // Line height for description text
+                });
+                builder.y += 2; // Small gap after description
 
                 // Certifications
                 if (item.certifications && item.certifications.length > 0) {
