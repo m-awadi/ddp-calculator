@@ -1,5 +1,6 @@
 import { CONTAINER_SPECS, DEFAULT_RATES, MOFA_FEE_TIERS, CERTIFICATE_OF_ORIGIN_FEE } from './constants.js';
 import { parseNumberInput } from './numberParsing.js';
+import { calculationsLogger as logger } from './logger.js';
 
 /**
  * Calculate MOFA attestation fees based on tiered structure
@@ -429,8 +430,12 @@ export const calculateDDP = (inputItems, settings, overrides = {}) => {
     // If input is the same as the last call, return the cached result.
     // This is the key to breaking the infinite re-render loop.
     if (deepCompare(currentInput, lastInput)) {
+        logger.debug('DDP calculation cache hit', { itemCount: inputItems.length });
         return lastResult;
     }
+
+    // Log calculation start
+    const endTimer = logger.startTimer('DDP calculation');
 
     // If input is different, perform the full calculation.
     const result = performDDPCalculation(inputItems, settings, overrides);
@@ -438,6 +443,20 @@ export const calculateDDP = (inputItems, settings, overrides = {}) => {
     // Cache a deep copy to avoid mutation-based staleness.
     lastInput = JSON.parse(JSON.stringify(currentInput));
     lastResult = result;
+
+    // Log calculation completion with summary
+    if (result) {
+        endTimer({
+            itemCount: inputItems.length,
+            totalCbm: result.summary.totalCbm,
+            totalExwCost: result.costs.totalExwCost,
+            ddpTotal: result.costs.ddpTotal,
+            containers: result.summary.containers,
+            pricingMode: settings.pricingMode || 'EXW'
+        });
+    } else {
+        logger.warn('DDP calculation returned null', { itemCount: inputItems.length });
+    }
 
     return result;
 };

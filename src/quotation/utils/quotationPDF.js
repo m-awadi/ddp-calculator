@@ -1,4 +1,5 @@
 import { detectTextDirection, escapeHtml } from './bidiUtils';
+import { pdfLogger as logger } from '../../utils/logger';
 
 /**
  * Convert an image URL to base64 data URI
@@ -7,17 +8,24 @@ import { detectTextDirection, escapeHtml } from './bidiUtils';
  */
 const imageToBase64 = async (url) => {
     try {
+        logger.debug('Converting image to base64', { url });
         const response = await fetch(url);
-        if (!response.ok) return null;
+        if (!response.ok) {
+            logger.warn('Image fetch failed', { url, status: response.status });
+            return null;
+        }
         const blob = await response.blob();
         return new Promise((resolve) => {
             const reader = new FileReader();
             reader.onloadend = () => resolve(reader.result);
-            reader.onerror = () => resolve(null);
+            reader.onerror = () => {
+                logger.warn('FileReader error for image', { url });
+                resolve(null);
+            };
             reader.readAsDataURL(blob);
         });
     } catch (error) {
-        console.error('Error converting image to base64:', error);
+        logger.error('Error converting image to base64', { error, url });
         return null;
     }
 };
@@ -483,6 +491,13 @@ export const generateQuotationPDF = async (data) => {
         // Determine backend URL based on environment
         const backendUrl = getBackendUrl();
 
+        logger.info('Sending PDF generation request to server', {
+            backendUrl,
+            filename,
+            itemCount: items.length,
+            htmlSize: html.length
+        });
+
         // Send HTML to backend for PDF generation
         const response = await fetch(`${backendUrl}/api/documents/html-to-pdf`, {
             method: 'POST',
@@ -494,11 +509,21 @@ export const generateQuotationPDF = async (data) => {
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            logger.error('Server PDF generation failed', {
+                status: response.status,
+                error: errorData.error,
+                filename
+            });
             throw new Error(errorData.error || `Server error: ${response.status}`);
         }
 
         // Download the PDF
         const blob = await response.blob();
+        logger.info('PDF generated successfully', {
+            filename,
+            blobSize: blob.size
+        });
+
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -508,8 +533,10 @@ export const generateQuotationPDF = async (data) => {
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
 
+        logger.info('PDF download triggered', { filename });
+
     } catch (error) {
-        console.error('Error generating PDF via server:', error);
+        logger.error('PDF generation error', { error, filename });
         // Show user-friendly error message
         alert(`Failed to generate PDF: ${error.message}\n\nPlease try the "Print to PDF" option instead.`);
         throw error;

@@ -8,6 +8,7 @@ import {
     QUOTATION_COLORS
 } from './utils/defaultTerms';
 import { detectTextDirection } from './utils/bidiUtils';
+import { quotationLogger as logger } from '../utils/logger';
 
 /**
  * @typedef {Object} InitialQuotationItem
@@ -259,6 +260,16 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
     const handleGeneratePDF = async () => {
         if (isGeneratingPDF) return;
         setIsGeneratingPDF(true);
+
+        logger.info('PDF generation started', {
+            itemCount: items.length,
+            totalUSD,
+            showPictureColumn,
+            showQAR
+        });
+
+        const endTimer = logger.startTimer('PDF generation');
+
         try {
             await generateQuotationPDF({
                 date: quotationDate,
@@ -279,8 +290,13 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                 showQAR,
                 qarExchangeRate
             });
+            endTimer({ success: true, itemCount: items.length });
         } catch (error) {
-            console.error('Error generating PDF:', error);
+            logger.error('PDF generation failed', {
+                error,
+                itemCount: items.length,
+                totalUSD
+            });
             // Error alert is shown by the quotationPDF function
         } finally {
             setIsGeneratingPDF(false);
@@ -288,6 +304,13 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
     };
 
     const handlePrintToPDF = () => {
+        logger.info('Print to PDF started', {
+            itemCount: items.length,
+            totalUSD,
+            showPictureColumn,
+            showQAR
+        });
+
         try {
             generateQuotationHTML({
                 date: quotationDate,
@@ -308,8 +331,9 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                 showQAR,
                 qarExchangeRate
             });
+            logger.info('Print preview generated successfully', { itemCount: items.length });
         } catch (error) {
-            console.error('Error generating print preview:', error);
+            logger.error('Print preview generation failed', { error, itemCount: items.length });
             alert('Error generating print preview. Please check the console for details.');
         }
     };
