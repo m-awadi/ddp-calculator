@@ -301,8 +301,7 @@ export const generateQuotationPDF = async (data) => {
         .terms-section {
             margin: 20px 0;
             font-family: 'Noto Sans Arabic', 'Roboto', sans-serif;
-            break-inside: avoid;
-            page-break-inside: avoid;
+            /* Allow sections to break - only individual items stay together */
         }
 
         .terms-title {
