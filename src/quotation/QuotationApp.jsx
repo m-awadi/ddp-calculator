@@ -26,6 +26,7 @@ import { quotationLogger as logger } from '../utils/logger';
  * }} props
  */
 const QuotationApp = ({ initialItems = [], onClose }) => {
+    const [quotationTitle, setQuotationTitle] = useState('DDP Quotation');
     const [quotationDate, setQuotationDate] = useState(new Date().toISOString().slice(0, 10));
     const [showPictureColumn, setShowPictureColumn] = useState(true);
     const [showCertificationColumn, setShowCertificationColumn] = useState(true);
@@ -288,7 +289,8 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                 totalOneTimeCost,
                 totalAddonsCost,
                 showQAR,
-                qarExchangeRate
+                qarExchangeRate,
+                quotationTitle
             });
             endTimer({ success: true, itemCount: items.length });
         } catch (error) {
@@ -329,7 +331,8 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                 totalOneTimeCost,
                 totalAddonsCost,
                 showQAR,
-                qarExchangeRate
+                qarExchangeRate,
+                quotationTitle
             });
             logger.info('Print preview generated successfully', { itemCount: items.length });
         } catch (error) {
@@ -432,6 +435,22 @@ const QuotationApp = ({ initialItems = [], onClose }) => {
                             Company Information
                         </h3>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                            <input
+                                type="text"
+                                value={quotationTitle}
+                                onChange={(e) => setQuotationTitle(e.target.value)}
+                                placeholder="Quotation Title (e.g., DDP Quotation)"
+                                style={{
+                                    padding: '10px',
+                                    border: `2px solid ${QUOTATION_COLORS.primary}`,
+                                    borderRadius: '6px',
+                                    fontSize: '14px',
+                                    fontWeight: '600',
+                                    color: QUOTATION_COLORS.primary,
+                                    backgroundColor: QUOTATION_COLORS.inputBackground || QUOTATION_COLORS.white,
+                                    gridColumn: '1 / -1'
+                                }}
+                            />
                             <input
                                 type="text"
                                 value={companyInfo.name}

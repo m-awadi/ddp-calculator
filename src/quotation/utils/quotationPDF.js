@@ -52,7 +52,8 @@ export const generateQuotationPDF = async (data) => {
         totalOneTimeCost = 0,
         totalAddonsCost = 0,
         showQAR = false,
-        qarExchangeRate = 3.65
+        qarExchangeRate = 3.65,
+        quotationTitle = 'DDP Quotation'
     } = data;
 
     // Helper function to format currency with optional QAR
@@ -200,6 +201,7 @@ export const generateQuotationPDF = async (data) => {
             border-collapse: collapse;
             margin: 20px 0;
             direction: ltr;
+            border: 1px solid #ddd;
         }
 
         th {
@@ -209,6 +211,7 @@ export const generateQuotationPDF = async (data) => {
             text-align: center;
             font-size: 12px;
             font-weight: bold;
+            border: 1px solid #D65A1F;
         }
 
         td {
@@ -395,7 +398,7 @@ export const generateQuotationPDF = async (data) => {
             ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" class="logo">` : ''}
         </div>
 
-        <div class="quotation-title">DDP Quotation</div>
+        <div class="quotation-title">${escapeHtml(quotationTitle)}</div>
 
         <table>
             <thead>

@@ -23,7 +23,8 @@ export const generateQuotationHTML = (data) => {
         totalOneTimeCost = 0,
         totalAddonsCost = 0,
         showQAR = false,
-        qarExchangeRate = 3.65
+        qarExchangeRate = 3.65,
+        quotationTitle = 'DDP Quotation'
     } = data;
 
     // Helper function to format currency with optional QAR
@@ -157,6 +158,7 @@ export const generateQuotationHTML = (data) => {
             margin: 20px 0;
             direction: ltr;
             font-family: 'Roboto', sans-serif;
+            border: 1px solid #ddd;
         }
 
         th {
@@ -167,6 +169,7 @@ export const generateQuotationHTML = (data) => {
             font-size: 12px;
             font-weight: bold;
             font-family: 'Roboto', sans-serif;
+            border: 1px solid #D65A1F;
         }
 
         td {
@@ -383,7 +386,7 @@ export const generateQuotationHTML = (data) => {
             <img src="/logo-standalone-web.png" alt="Logo" class="logo">
         </div>
 
-        <div class="quotation-title">DDP Quotation</div>
+        <div class="quotation-title">${escapeHtml(quotationTitle)}</div>
 
         <table>
             <thead>
@@ -394,7 +397,7 @@ export const generateQuotationHTML = (data) => {
                     <th>Qty (${quantityUnit})</th>
                     <th>Price (USD)</th>
                     <th>Total (USD)</th>
-                    ${showCertificationColumn ? `<th>${extraColumnLabel}</th>` : ''}
+                    ${showCertificationColumn ? `<th>${escapeHtml(extraColumnLabel)}</th>` : ''}
                 </tr>
             </thead>
             <tbody>
