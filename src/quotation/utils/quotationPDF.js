@@ -84,7 +84,7 @@ export const generateQuotationPDF = async (data) => {
     // Using Noto Sans Arabic for proper Arabic text support + Roboto for English
     const html = `
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="en" dir="ltr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -104,7 +104,7 @@ export const generateQuotationPDF = async (data) => {
 
         @page {
             size: A4;
-            margin: 15mm 10mm 20mm 10mm; /* top, right, bottom, left */
+            margin: 12mm 8mm 15mm 8mm;
         }
 
         body {
@@ -114,10 +114,13 @@ export const generateQuotationPDF = async (data) => {
             line-height: 1.6;
             margin: 0;
             padding: 0;
+            direction: ltr;
         }
 
         .page {
             width: 100%;
+            max-width: 100%;
+            overflow: hidden;
             background: #FFFFFF;
             color: #1B2B38;
         }
@@ -198,8 +201,10 @@ export const generateQuotationPDF = async (data) => {
 
         table {
             width: 100%;
+            max-width: 100%;
+            table-layout: fixed;
             border-collapse: collapse;
-            margin: 20px 0;
+            margin: 15px 0;
             direction: ltr;
             border: 1px solid #ddd;
         }
@@ -207,26 +212,28 @@ export const generateQuotationPDF = async (data) => {
         th {
             background: #D65A1F;
             color: #FFFFFF;
-            padding: 12px 8px;
+            padding: 10px 6px;
             text-align: center;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: bold;
             border: 1px solid #D65A1F;
+            overflow: hidden;
         }
 
         td {
             border: 1px solid #ddd;
-            padding: 10px 8px;
+            padding: 8px 6px;
             text-align: center;
             font-size: 11px;
             color: #1B2B38;
+            overflow: hidden;
+            word-wrap: break-word;
         }
 
         td.description {
             font-weight: bold;
             word-wrap: break-word;
             overflow-wrap: break-word;
-            max-width: 200px;
             white-space: pre-wrap;
         }
 
@@ -245,8 +252,8 @@ export const generateQuotationPDF = async (data) => {
         }
 
         .item-image {
-            max-width: 300px;
-            max-height: 300px;
+            max-width: 100%;
+            max-height: 200px;
             object-fit: contain;
             display: block;
             margin: 4px auto;
